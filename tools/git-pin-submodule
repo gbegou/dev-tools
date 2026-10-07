@@ -1,0 +1,202 @@
+#!/usr/bin/env bash
+# Pin a submodule to a URL, a tracked branch and a commit, whether it exists or not. What is not
+# given is taken from .gitmodules (URL, branch) or fetched (the branch's tip), so that
+# `git pin-submodule <path>` alone updates an existing submodule to the tip of its branch.
+#
+# Usage:
+#   git-pin-submodule <path> [--url <url>] [--branch <branch>] [--commit <commit> | --tag <tag>]
+#   git pin-submodule <path> [-u <url>] [-b <branch>] [-c <commit> | -t <tag>]  # same, once on PATH
+#   git-pin-submodule -h | --help                                               # this help
+#
+#   <path>    path of the submodule, relative to the root of the superproject
+#   --url     repository to clone it from; default: the one in .gitmodules (required for a new
+#             submodule)
+#   --branch  branch recorded in .gitmodules (the one `git submodule update --remote` follows);
+#             the commit should be on it. Default: the one in .gitmodules, else the default
+#             branch of the repository
+#   --commit  the commit to pin (full or abbreviated SHA); default: the current tip of the
+#             branch (fetched now): the way to update a submodule
+#   --tag     a tag to pin instead of a commit: fetched by name, its commit is pinned (a
+#             release, e.g. 5.0.1); the branch is still recorded (its default rules apply)
+#
+#   git pin-submodule external/pomac                      # the tip of its recorded branch
+#   git pin-submodule external/pomac -b dev/official      # switch branch, pin its tip
+#   git pin-submodule external/eigen -b 5.0 -t 5.0.1      # a release tag
+#   git pin-submodule external/eigen -b 5.0 -c bc3b398    # an exact commit
+#   git pin-submodule external/new -u https://... -b main # add a submodule
+#
+# Run it anywhere inside the superproject. It stages the result (.gitmodules and the
+# submodule) and does not commit: review with `git diff --cached`, then commit.
+#
+# Steps, and the git command behind each one:
+#
+#  1. Find the root of the superproject, and the submodule's name from its path (the name
+#     is the key in .gitmodules; it is usually the path, but not always).
+#       git rev-parse --show-toplevel
+#           prints the root directory of the current repository.
+#       git config -f .gitmodules --get-regexp '^submodule\..*\.path$'
+#           lists the "submodule.<name>.path <path>" entries of .gitmodules.
+#       git config -f .gitmodules --get submodule.<name>.url (and .branch)
+#           the recorded URL and branch, the defaults of <url> and <branch>.
+#       git ls-remote --symref <url> HEAD
+#           only without a branch anywhere: the default branch of the repository.
+#
+#  2a. The submodule is new: add it.
+#       git submodule add --name <path> -b <branch> <url> <path>
+#           clones <url> into <path> at the tip of <branch>, writes the entry
+#           (path, url, branch) in .gitmodules and stages the submodule.
+#
+#  2b. The submodule exists: point it to <url> and <branch>, then make sure it is cloned.
+#       git submodule set-url -- <path> <url>
+#           changes its url in .gitmodules, and in .git/config (the URL actually used).
+#       git submodule set-branch --branch <branch> -- <path>
+#           records the branch in .gitmodules.
+#       git -C <path> fetch origin +refs/heads/<branch>:refs/remotes/origin/<branch>
+#           only if the submodule is already cloned: updates origin/<branch>, which the next
+#           command reads, even when the clone only tracks other branches (single-branch).
+#       git submodule update --init --remote -- <path>
+#           clones it if needed, and checks out the tip of <branch> from <url>. --remote
+#           is used because the commit recorded so far may not exist at <url>.
+#
+#  3. Check out the commit.
+#       git -C <path> fetch origin <branch>
+#           downloads the latest history of <branch> from <url> (FETCH_HEAD). Without a
+#           <commit> argument, FETCH_HEAD (the tip of <branch>) is the commit.
+#       git -C <path> fetch origin tag <tag>
+#           with --tag: downloads the tag and its history; the commit is the one it points
+#           to (the tag's own object for an annotated tag is dereferenced).
+#       git -C <path> fetch origin <commit>
+#           only if <commit> is still unknown (an old commit no longer on the branch):
+#           asks the server for that commit directly (GitHub and GitLab allow it).
+#       git -C <path> checkout --detach <commit>
+#           puts the submodule's working tree at <commit> (detached HEAD, as submodules are).
+#       git -C <path> merge-base --is-ancestor <commit> FETCH_HEAD
+#           checks that <commit> is in the history of <branch>; a warning only if not.
+#
+#  4. Stage the result in the superproject.
+#       git add .gitmodules <path>
+#           stages .gitmodules and the new gitlink (the commit the superproject records).
+#
+# Exit status: 0 on success; 2 on bad usage; otherwise the status of the git command that
+# failed (its message says why), and nothing more is done.
+set -euo pipefail
+
+usage() { sed -n '2,/^set -euo/p' "$0" | sed '$d' | sed 's/^# \{0,1\}//'; }
+short() { if [[ -n ${1:-} ]]; then echo "${1:0:7}"; else echo none; fi; }
+
+case ${1:-} in
+  -h|--help) usage; exit 0 ;;
+esac
+path=""; url=""; branch=""; commit=""; tag=""
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -u|--url)    [[ $# -ge 2 ]] || { echo "$1 needs a value" >&2; exit 2; }; url=$2; shift 2 ;;
+    -b|--branch) [[ $# -ge 2 ]] || { echo "$1 needs a value" >&2; exit 2; }; branch=$2; shift 2 ;;
+    -c|--commit) [[ $# -ge 2 ]] || { echo "$1 needs a value" >&2; exit 2; }; commit=$2; shift 2 ;;
+    -t|--tag)    [[ $# -ge 2 ]] || { echo "$1 needs a value" >&2; exit 2; }; tag=$2; shift 2 ;;
+    -*) echo "unknown option: $1 (see --help)" >&2; exit 2 ;;
+    *) [[ -z $path ]] || { echo "one <path> only (got '$path' and '$1'; see --help)" >&2; exit 2; }
+       path=${1%/}; shift ;;
+  esac
+done
+if [[ -z $path ]]; then
+  echo "usage: git-pin-submodule <path> [--url <url>] [--branch <branch>] [--commit <commit> | --tag <tag>] (see --help)" >&2
+  exit 2
+fi
+if [[ -n $commit && -n $tag ]]; then
+  echo "git-pin-submodule: --commit and --tag exclude each other" >&2
+  exit 2
+fi
+
+# 1. root, name, and the defaults from .gitmodules
+cd "$(git rev-parse --show-toplevel)"
+echo "== $path (superproject: $PWD)"
+name=""
+if [[ -f .gitmodules ]]; then
+  name=$(git config -f .gitmodules --get-regexp '^submodule\..*\.path$' \
+         | awk -v p="$path" '$2 == p { sub(/^submodule\./, "", $1); sub(/\.path$/, "", $1); print $1 }')
+fi
+old_url=""; old_branch=""; old_commit=""
+if [[ -n $name ]]; then
+  old_url=$(git config -f .gitmodules --get "submodule.$name.url" || true)
+  old_branch=$(git config -f .gitmodules --get "submodule.$name.branch" || true)
+  old_commit=$(git ls-files -s -- "$path" | awk '$1 == "160000" {print $2}')
+  echo "   in .gitmodules as '$name': url ${old_url:-none}, branch ${old_branch:-none}," \
+       "commit $(short "$old_commit")"
+  [[ -n $url ]] || url=$old_url
+  [[ -n $branch ]] || branch=$old_branch
+else
+  echo "   not in .gitmodules: a new submodule"
+fi
+if [[ -z $url ]]; then
+  echo "git-pin-submodule: $path is not in .gitmodules: give its <url> (see --help)" >&2
+  exit 2
+fi
+if [[ -z $branch ]]; then
+  branch=$(GIT_TERMINAL_PROMPT=0 git ls-remote --symref "$url" HEAD 2>/dev/null \
+           | awk '$1 == "ref:" {sub("refs/heads/", "", $2); print $2; exit}')
+  if [[ -z $branch ]]; then
+    echo "git-pin-submodule: no branch in .gitmodules and none at $url: give the <branch>" >&2
+    exit 2
+  fi
+  echo "   branch: $branch (the default branch of the repository)"
+fi
+if [[ -n $tag ]]; then target="the tag $tag"; else target=${commit:-the tip of the branch}; fi
+echo "   target: url $url, branch $branch, commit $target"
+
+# 2. add, or update the url and branch
+if [[ -z $name ]]; then
+  echo "-- git submodule add: cloning $url into $path"
+  git submodule add --name "$path" -b "$branch" "$url" "$path"
+else
+  [[ $url == "$old_url" ]] || echo "-- url changed: $old_url -> $url (.gitmodules and .git/config)"
+  git submodule set-url -- "$path" "$url"
+  [[ $branch == "$old_branch" ]] || echo "-- branch changed: ${old_branch:-none} -> $branch (.gitmodules)"
+  git submodule set-branch --branch "$branch" -- "$path"
+  if [[ -e $path/.git ]]; then # cloned: its fetch refspec may not cover <branch> (single-branch)
+    echo "-- fetching $branch from $url"
+    git -C "$path" fetch -q origin "+refs/heads/$branch:refs/remotes/origin/$branch"
+  else
+    echo "-- $path is not cloned: cloning $url"
+  fi
+  git submodule update --init --remote -- "$path"
+fi
+
+# 3. the commit (the tip of the branch if none was given, or the commit of the tag)
+git -C "$path" fetch -q origin "$branch"
+tip=$(git -C "$path" rev-parse FETCH_HEAD)
+if [[ -n $tag ]]; then
+  echo "-- fetching the tag $tag from $url"
+  git -C "$path" fetch -q origin "tag" "$tag" --no-tags
+  commit=$(git -C "$path" rev-parse "$tag^{commit}")
+  echo "-- commit: ${commit:0:7}, the tag $tag"
+elif [[ -z $commit ]]; then
+  commit=$tip
+  echo "-- commit: ${commit:0:7}, the tip of $branch"
+elif ! git -C "$path" cat-file -e "$commit^{commit}" 2>/dev/null; then
+  echo "-- commit $commit is not in the clone: fetching it from $url"
+  git -C "$path" fetch -q origin "$commit"
+fi
+git -C "$path" checkout -q --detach "$commit"
+if git -C "$path" merge-base --is-ancestor HEAD "$tip"; then
+  behind=$(git -C "$path" rev-list --count "HEAD..$tip")
+  [[ $behind -eq 0 ]] || echo "-- $behind commit(s) behind the tip of $branch (${tip:0:7})"
+else
+  echo "warning: $commit is not in the history of $branch at $url" >&2
+fi
+
+# 4. stage
+git add .gitmodules "$path"
+new_commit=$(git -C "$path" rev-parse HEAD)
+if [[ -n $old_commit && $old_commit != "$new_commit" ]]; then
+  if git -C "$path" cat-file -e "$old_commit^{commit}" 2>/dev/null; then
+    echo "-- commit changed: ${old_commit:0:7} -> ${new_commit:0:7}" \
+         "($(git -C "$path" rev-list --count "$old_commit..$new_commit") ahead," \
+         "$(git -C "$path" rev-list --count "$new_commit..$old_commit") behind)"
+  else
+    echo "-- commit changed: ${old_commit:0:7} -> ${new_commit:0:7} (the old one is not at $url)"
+  fi
+elif [[ -n $old_commit ]]; then
+  echo "-- commit unchanged: ${new_commit:0:7}"
+fi
+echo "   $path -> $url $branch ${new_commit:0:7}${tag:+ (tag $tag)} $(git -C "$path" log -1 --format='%cs "%s"') (staged, not committed)"

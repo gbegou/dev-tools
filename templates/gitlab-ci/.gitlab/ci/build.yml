@@ -1,0 +1,32 @@
+# =============================================================================
+# STAGE: BUILD
+# =============================================================================
+#
+# Configure and compile once, with all the tests enabled.
+#
+# Rule: test jobs never re-run cmake. They run in parallel on the same build
+# directory, and reconfiguring it would overwrite CMakeCache.txt and generated
+# files under their feet. They select subsets with ctest -R instead.
+# The documentation has its own build directory (doc.yml).
+
+job:build:
+  stage: build
+  extends: .with_hpc_modules
+
+  needs:
+    - job: job:init
+      artifacts: true
+
+  script:
+    - set -e
+    - cd "${BUILD_DIR}"
+    - source source.sh
+    - |
+      cmake \
+      -DCMAKE_BUILD_TYPE=Debug \
+      -Dpomac_ENABLE_TESTS=ON \
+      -Dpomac_ENABLE_WARNINGS_AS_ERRORS=ON \
+      -Dpomac_ENABLE_DOCUMENTATION=OFF \
+      -DPython_EXECUTABLE="$(command -v python3)" \
+      ..
+    - make -j ${BUILD_JOBS}

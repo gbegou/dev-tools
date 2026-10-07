@@ -1,0 +1,28 @@
+# =============================================================================
+# GitLab CI of pomac: the jobs are in .gitlab/ci/
+# =============================================================================
+#
+#   workflow.yml  pipeline creation rules
+#   common.yml    variables, runner, module template, test template
+#   init.yml      manual clone into the shared Jacamar workspace, submodules
+#   build.yml     configure and compile once (all tests enabled)
+#   test.yml      tests of the library (ctest -R subsets): C++, Python
+#   quality.yml   code quality (optional tools, allowed to fail): stubs, doc build, lint
+#   doc.yml       documentation (separate build directory) and GitLab pages
+
+stages:
+  - init
+  - build
+  - test
+  - quality
+  - doc
+  - deploy
+
+include:
+  - local: .gitlab/ci/workflow.yml
+  - local: .gitlab/ci/common.yml
+  - local: .gitlab/ci/init.yml
+  - local: .gitlab/ci/build.yml
+  - local: .gitlab/ci/test.yml
+  - local: .gitlab/ci/quality.yml
+  - local: .gitlab/ci/doc.yml

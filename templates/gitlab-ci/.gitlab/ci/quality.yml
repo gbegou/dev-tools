@@ -1,0 +1,57 @@
+# =============================================================================
+# STAGE: QUALITY
+# =============================================================================
+#
+# Code quality checks, which depend on optional development tools: stubs up to
+# date, documentation build, lint and type checking. If a tool is missing, the job
+# exits with code 3, an allowed failure (orange): kept apart from the test stage,
+# so that the tests themselves stay green at first glance.
+#
+# The ctest jobs need job:build only (not the test stage): they run as soon as the
+# build is done, in parallel with the tests.
+
+# Type stubs of cpomac (stubs/) match the compiled module
+job:stubs:
+  extends: .test_template
+  stage: quality
+  allow_failure:
+    exit_codes: 3  # optional tool missing
+  variables:
+    CTEST_LABEL: "pomac_stubs"
+    OPTIONAL_PYTHON_MODULES: "pybind11_stubgen"
+
+# The documentation builds without warning (Sphinx -W, into build/doc/test_html:
+# no reconfiguration of the build directory)
+job:doc-build:
+  extends: .test_template
+  stage: quality
+  allow_failure:
+    exit_codes: 3  # optional tool missing
+  variables:
+    CTEST_LABEL: "pomac_doc_build"
+    # Sphinx, the theme and its extension (installed, or submodules in doc/external/)
+    OPTIONAL_PYTHON_MODULES: "sphinx sphinxcontrib.jquery sphinx_rtd_theme"
+
+# Lint and type checking of the Python code (no build needed: basedpyright uses stubs/)
+# Optional tools: exit code 3 (allowed failure, warning) if ruff or basedpyright is missing.
+job:lint:
+  stage: quality
+  extends: .with_hpc_modules
+  needs:
+    - job: job:init
+      artifacts: true
+  allow_failure:
+    exit_codes: 3
+  script:
+    - set -e
+    - cd "${CUSTOM_CI_DIR}"
+    - |
+      for tool in ruff basedpyright; do
+        if ! command -v "${tool}" >/dev/null; then
+          echo "${tool} is not installed: lint skipped"
+          exit 3
+        fi
+      done
+    - ruff check .
+    - ruff format --check .
+    - basedpyright

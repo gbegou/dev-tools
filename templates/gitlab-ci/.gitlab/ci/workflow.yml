@@ -1,0 +1,16 @@
+# -----------------------------------------------------------------------------
+# Pipeline creation rules
+# -----------------------------------------------------------------------------
+#
+# Current policy:
+#   - do not create merge-request pipelines
+#   - create all other pipelines
+#
+# This avoids duplicate pipelines when a branch with an open MR receives a commit.
+# The pipeline still runs for the branch, just not as a merge-request pipeline.
+
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - when: always

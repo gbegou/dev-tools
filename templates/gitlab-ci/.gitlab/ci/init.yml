@@ -1,0 +1,50 @@
+# =============================================================================
+# STAGE: INIT
+# =============================================================================
+#
+# Manual clone into a shared Jacamar workspace:
+#
+#   ~/.jacamar-ci/builds/${CI_PROJECT_NAME}/${CI_PIPELINE_ID}
+#
+# Later jobs receive this path through a dotenv artifact and reuse the same
+# directory, instead of uploading/downloading the build tree as an artifact.
+#
+# Requirement: all the jobs run on runners that share this filesystem.
+
+job:init:
+  stage: init
+  extends: .with_hpc_modules
+
+  script:
+    - set -e
+    # GitLab collects build.env from the original job directory (dotenv artifact).
+    - INIT_ORIGINAL_FOLDER="$(pwd)"
+    - CI_WORKSPACE_BASE="${HOME}/.jacamar-ci/builds/${CI_PROJECT_NAME}"
+    - mkdir -p "${CI_WORKSPACE_BASE}"
+    - cd "${CI_WORKSPACE_BASE}"
+    # Clean a previous directory with the same pipeline ID (retried job).
+    - rm -rf "${CI_PIPELINE_ID}"
+    - git clone "${CI_REPOSITORY_URL}" "${CI_PIPELINE_ID}"
+    - cd "${CI_PIPELINE_ID}"
+    - git checkout "${CI_COMMIT_SHA}"
+    # Paths for later jobs (dotenv artifacts transfer variables, not files).
+    - echo "CUSTOM_CI_DIR=${PWD}" >> "${INIT_ORIGINAL_FOLDER}/build.env"
+    # Submodules, listed explicitly.
+    - git submodule update --init external/project_utils
+    - git submodule update --init external/pytest_parallel
+    - git submodule update --init external/std_e
+    # optional: pybind11 >= 2.12 as a submodule (used by CMake instead of the Python environment's)
+    - if git config -f .gitmodules submodule.external/pybind11.path >/dev/null; then git submodule update --init external/pybind11; fi
+    # optional: pybind11-stubgen as a submodule (used by cmake/stubs.py instead of an installed one)
+    - if git config -f .gitmodules submodule.external/pybind11-stubgen.path >/dev/null; then git submodule update --init external/pybind11-stubgen; fi
+    # optional: Sphinx packages as submodules in doc/external/ (theme, extensions: see doc/conf.py)
+    - git config -f .gitmodules --get-regexp '^submodule\..*\.path$' | awk '$2 ~ /^doc\/external\//{print $2}' | xargs -r git submodule update --init
+    - mkdir build
+    - echo "BUILD_DIR=${PWD}/build" >> "${INIT_ORIGINAL_FOLDER}/build.env"
+    - cd build
+    # First configuration: writes source.sh.
+    - cmake ..
+
+  artifacts:
+    reports:
+      dotenv: build.env

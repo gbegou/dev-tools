@@ -1,0 +1,20 @@
+# =============================================================================
+# STAGE: TEST
+# =============================================================================
+#
+# The tests of the library: each job runs one subset of the ctest tests (see
+# .test_template in common.yml). With --no-tests=error, a job fails if its pattern
+# selects no test (e.g. a renamed test). Any failure is red: the checks that depend
+# on optional tools are in the quality stage (quality.yml).
+
+# C++ unit tests (*.test.cpp) and C++ documentation snippets (*.snippet.cpp)
+job:test-cpp:
+  extends: .test_template
+  variables:
+    CTEST_LABEL: "pomac_doctest"
+
+# Python unit and functional tests, Python documentation snippets
+job:test-python:
+  extends: .test_template
+  variables:
+    CTEST_LABEL: "pomac_pytest"
