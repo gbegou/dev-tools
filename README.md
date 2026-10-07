@@ -1,4 +1,4 @@
-# claude-rules
+# dev-tools
 
 Rules and tools I give to Claude, reusable across projects.
 
