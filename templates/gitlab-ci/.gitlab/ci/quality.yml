@@ -33,7 +33,11 @@ job:doc-build:
     OPTIONAL_PYTHON_MODULES: "sphinx sphinxcontrib.jquery sphinx_rtd_theme"
 
 # Lint and type checking of the Python code (no build needed: basedpyright uses stubs/)
-# Optional tools: exit code 3 (allowed failure, warning) if ruff or basedpyright is missing.
+# ruff and basedpyright are installed in a temporary venv built from the loaded
+# python3 (same version). Findings never fail the pipeline: they are published as
+# GitLab Code Quality reports (shown in merge requests) and mark the job orange.
+#   exit 3: venv or install failed (optional tool missing, e.g. no network)
+#   exit 4: quality issues found (see the job log or the Code Quality report)
 job:lint:
   stage: quality
   extends: .with_hpc_modules
@@ -41,17 +45,59 @@ job:lint:
     - job: job:init
       artifacts: true
   allow_failure:
-    exit_codes: 3
+    exit_codes:
+      - 3  # optional tool missing
+      - 4  # quality issues found
+  variables:
+    PIP_CACHE_DIR: "${CI_PROJECT_DIR}/.cache/pip"
+  cache:
+    key: "${CI_JOB_NAME}-pip"
+    paths:
+      - .cache/pip
   script:
     - set -e
-    - cd "${CUSTOM_CI_DIR}"
+    - echo "Using $(command -v python3) ($(python3 --version))"
+    # Temporary venv, outside the repository (not linted, not type checked)
+    - LINT_VENV="$(mktemp -d)/venv"
     - |
-      for tool in ruff basedpyright; do
-        if ! command -v "${tool}" >/dev/null; then
-          echo "${tool} is not installed: lint skipped"
-          exit 3
-        fi
-      done
-    - ruff check .
-    - ruff format --check .
-    - basedpyright
+      if ! python3 -m venv --system-site-packages "${LINT_VENV}"; then
+        echo "Cannot create venv with $(command -v python3): lint skipped"
+        exit 3
+      fi
+    - source "${LINT_VENV}/bin/activate"
+    - |
+      if ! python -m pip install --quiet ruff basedpyright; then
+        echo "Cannot install ruff/basedpyright: lint skipped"
+        exit 3
+      fi
+    - ruff --version
+    - basedpyright --version
+    - cd "${CUSTOM_CI_DIR}"
+    # Each tool runs even if a previous one found issues: all findings at once
+    - status=0
+    # ruff check: readable output in the log (sets the status), then the report
+    - ruff check . || status=4
+    - CI_PROJECT_DIR="${CUSTOM_CI_DIR}" ruff check --exit-zero --output-format=gitlab --output-file="${CI_PROJECT_DIR}/gl-ruff.json" .
+    # ruff format: no report format, log only
+    - ruff format --check . || status=4
+    # basedpyright: log output and report in a single run
+    - basedpyright --pythonpath "$(command -v python)" --gitlabcodequality "${CI_PROJECT_DIR}/gl-basedpyright.json" || status=4
+    # GitLab accepts a single codequality file per job: merge both reports,
+    # with paths relative to the repository root (the current directory)
+    - >-
+      python .gitlab/ci/merge_codequality.py
+      "${CI_PROJECT_DIR}/gl-code-quality.json"
+      "${CI_PROJECT_DIR}/gl-ruff.json"
+      "${CI_PROJECT_DIR}/gl-basedpyright.json"
+    - |
+      if [ "${status}" -ne 0 ]; then
+        echo "Quality issues found (see above or the Code Quality report): job marked as warning"
+      fi
+    - exit "${status}"
+  artifacts:
+    when: always  # also when issues are found (non-zero exit)
+    expire_in: 1 week
+    paths:
+      - gl-code-quality.json
+    reports:
+      codequality: gl-code-quality.json

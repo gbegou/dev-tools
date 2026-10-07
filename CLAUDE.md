@@ -110,8 +110,9 @@ project.
 
 ## GitLab CI (cluster)
 
-- No virtual environment in CI: the environment comes from the loaded modules. I update the
-  module versions myself.
+- The build and test environment comes from the loaded modules, no virtual environment. I
+  update the module versions myself. The one exception is `job:lint`: ruff and basedpyright are
+  installed in a temporary venv (`--system-site-packages`, from the loaded python3).
 - Layout: `.gitlab-ci.yml` includes `.gitlab/ci/{common,init,build,test,quality,doc}.yml`
   (see `templates/gitlab-ci/`). `job:init` clones manually into a shared workspace and passes
   the paths as a dotenv artifact. `job:build` configures and builds once, with all tests
@@ -119,7 +120,8 @@ project.
 - Stages `init, build, test, quality, doc, deploy`. The real tests are in `test` and fail red.
   Checks that depend on optional tools (stubs, doc build, lint) are in `quality`, and exit with
   code 3 (an allowed failure, orange) when a tool is missing, so that the `test` stage reads
-  green or red at a glance.
+  green or red at a glance. `job:lint` exits with code 4 (orange too) on findings, published
+  as a GitLab Code Quality report (`.gitlab/ci/merge_codequality.py` merges the tools' reports).
 - Check the YAML before pushing (`tools/check_ci.py`): an unquoted `: ` in a script line turns
   it into a mapping.
 
