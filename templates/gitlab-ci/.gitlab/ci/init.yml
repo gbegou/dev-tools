@@ -37,9 +37,6 @@ job:init:
     - if git config -f .gitmodules submodule.external/pybind11.path >/dev/null; then git submodule update --init external/pybind11; fi
     # optional: pybind11-stubgen as a submodule (used by cmake/stubs.py instead of an installed one)
     - if git config -f .gitmodules submodule.external/pybind11-stubgen.path >/dev/null; then git submodule update --init external/pybind11-stubgen; fi
-    # optional: Sphinx packages as submodules in doc/external/ (theme, extensions: see doc/conf.py);
-    # recursive: an extension may have submodules of its own (sphinx-copybutton's clipboard.js)
-    - git config -f .gitmodules --get-regexp '^submodule\..*\.path$' | awk '$2 ~ /^doc\/external\//{print $2}' | xargs -r git submodule update --init --recursive
     - mkdir build
     - echo "BUILD_DIR=${PWD}/build" >> "${INIT_ORIGINAL_FOLDER}/build.env"
     - cd build

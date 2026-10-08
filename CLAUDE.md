@@ -100,9 +100,10 @@ project.
 
 ## Build and dependencies
 
-- Dependencies are git submodules: code and tool dependencies in `external/` (e.g.
-  `external/pybind11`, `external/pybind11-stubgen`), documentation dependencies (Sphinx themes
-  and extensions) in `doc/external/`, not in `external/`.
+- Code and tool dependencies are git submodules in `external/` (e.g. `external/pybind11`,
+  `external/pybind11-stubgen`). Documentation dependencies (Sphinx, themes, extensions) are
+  the `doc` dependency group of `pyproject.toml`, installed in a venv (not submodules: an
+  extension can carry symlinks into submodules of its own).
 - Development tools are optional: a test that needs a missing tool is not registered (with a
   CMake warning), so that the rest still runs.
 - Deployment uses modulefiles; testing uses the `source.sh` that project_utils writes in the
@@ -111,14 +112,15 @@ project.
 ## GitLab CI (cluster)
 
 - The build and test environment comes from the loaded modules, no virtual environment. I
-  update the module versions myself. The one exception is `job:lint`: ruff and basedpyright are
-  installed in a temporary venv (`--system-site-packages`, from the loaded python3).
+  update the module versions myself. The exceptions are `job:lint` (ruff and basedpyright) and
+  `job:doc` (the `doc` dependency group): a temporary venv (`--system-site-packages`, from the
+  loaded python3).
 - Layout: `.gitlab-ci.yml` includes `.gitlab/ci/{common,init,build,test,quality,doc}.yml`
   (see `templates/gitlab-ci/`). `job:init` clones manually into a shared workspace and passes
   the paths as a dotenv artifact. `job:build` configures and builds once, with all tests
   enabled. Test jobs only select subsets with `ctest -R` (never reconfigure).
 - Stages `init, build, test, quality, doc, deploy`. The real tests are in `test` and fail red.
-  Checks that depend on optional tools (stubs, doc build, lint) are in `quality`, and exit with
+  Checks that depend on optional tools (stubs, lint) are in `quality`, and exit with
   code 3 (an allowed failure, orange) when a tool is missing, so that the `test` stage reads
   green or red at a glance. `job:lint` exits with code 4 (orange too) on findings, published
   as a GitLab Code Quality report (`.gitlab/ci/merge_codequality.py` merges the tools' reports).
