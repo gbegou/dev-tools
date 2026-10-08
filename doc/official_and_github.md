@@ -73,7 +73,8 @@ sync_project.sh --apply <name> to-github
 
 `.gitmodules` is copied as is, and the submodules are registered at the official commits
 (gitlinks), so that the GitHub copy builds the same thing. GitHub-only files are kept.
-Commit in the GitHub copy; then `git submodule update --init` to populate the checkouts.
+Commit in the GitHub copy; then `git submodule update --init --recursive` to populate the
+checkouts (recursive: a documentation extension may carry submodules of its own).
 
 ## Submodules: `git pin-submodule`
 
