@@ -18,22 +18,36 @@ This installs the ``notation-manager`` command (also ``python -m notation_manage
 In short
 --------
 
-1. Write the notations in a notation file (by hand, or with ``notation-manager gui``).
-2. Export them: ``notation-manager export notations.toml notations.tex`` and
-   ``notation-manager export notations.toml notations.typ``.
+1. Write the notations in a notation file (by hand, or with ``notation-manager gui``), with
+   their descriptions in one language or several (English, French...).
+2. Export them, in the language of the document: ``notation-manager export notations.toml
+   notations.tex`` and ``notation-manager export --language fr notations.toml notations.typ``.
 3. Use them: ``\velocity`` in LaTeX, ``$velocity$`` in Typst, and print the nomenclature.
 
 The notation file
 -----------------
 
-A notation file is a TOML file. Here is the example of the repository,
-``examples/notations.toml``:
+A notation file is a TOML file. Two things vary in it:
+
+- the **format**, LaTeX or Typst: the code of a symbol differs (``\mathbf{u}``,
+  ``bold(u)``), and so may the units and, rarely, a description that holds markup;
+- the **language**, English, French...: the descriptions and the group titles are
+  translated.
+
+Here is the example of the repository, ``examples/notations.toml``, in English and French:
 
 .. literalinclude:: ../examples/notations.toml
    :language: toml
 
 ``version``
    The version of the file format, ``1``; optional.
+
+``languages``
+   The language codes of the descriptions and titles (``en``, ``fr``, ``de``, ``pt-BR``:
+   the codes of Typst's ``text(lang:)`` and of BCP 47); ``["en"]`` when it is left out.
+   The first one is the **default language**: every description and title has a
+   translation in it. The other translations are optional; an export in a language falls
+   back on the default language for the ones missing, with a warning.
 
 ``[groups.<key>]``
    A group, shown under its ``title`` in the nomenclature. The key is letters, digits,
@@ -54,13 +68,13 @@ A notation file is a TOML file. Here is the example of the repository,
         - Content
       * - ``symbol``
         - yes
-        - The symbol, as math-mode code without the ``$`` delimiters.
+        - The symbol, per format, as math-mode code without the ``$`` delimiters.
       * - ``description``
         - yes
-        - The description, as text-mode markup.
+        - The description, per language, as text-mode markup.
       * - ``units``
         - no
-        - The units, as text-mode markup.
+        - The units, per format, as text-mode markup (not translated).
       * - ``group``
         - no
         - The key of the notation's group.
@@ -71,11 +85,24 @@ A notation file is a TOML file. Here is the example of the repository,
         - no
         - The sort key in the nomenclature (the name by default).
 
-Rendered fields
-   ``symbol``, ``description``, ``units`` and ``title`` are each a string, the same in every
-   language (``description = "Velocity"``), or a table with one string per language
-   (``symbol = { latex = '\mathbf{u}', typst = 'bold(upright(u))' }``). TOML literal strings,
-   between single quotes, need no escaping of backslashes.
+Fields per format
+   ``symbol`` and ``units`` are a string, the same in both formats (``symbol = 'p'``), or a
+   table with one string per format
+   (``symbol = { latex = '\mathbf{u}', typst = 'bold(upright(u))' }``). TOML literal
+   strings, between single quotes, need no escaping of backslashes.
+
+Fields per language
+   ``description`` and ``title`` are a table with one entry per language
+   (``description = { en = "Velocity", fr = "Vitesse" }``), each entry a string, the same in
+   both formats, or a table with one string per format, for a text that holds markup:
+
+   .. code-block:: toml
+
+      description.en = { latex = 'Reynolds number, $\rho U L / \mu$', typst = 'Reynolds number, $rho U L \/ mu$' }
+      description.fr = { latex = 'Nombre de Reynolds, $\rho U L / \mu$', typst = 'Nombre de Reynolds, $rho U L \/ mu$' }
+
+   A string, or a table of formats, alone is the text in the default language: a file in
+   one language writes ``description = "Velocity"``.
 
 Arguments
    A notation with arguments uses the placeholders ``#1`` to ``#9`` in its symbol, in both
@@ -98,8 +125,10 @@ notation (or group) and the field; nothing is read when there is a problem. The 
 - the name is two letters or more; it is not a Typst keyword (``in``, ``none``, ``let``...),
   nor ``std`` or ``notationnomenclature`` (which the exports define), nor a name that starts
   with ``end`` (LaTeX does not define those with ``\newcommand``);
-- the symbol and the description are given in every language; the units are given in every
-  language or in none;
+- the languages are valid codes, declared once; every description and title has a
+  translation in the default language, and none in a language not declared;
+- the symbol and each translation are given in both formats; the units are given in both
+  formats or in none;
 - the braces of the LaTeX texts balance (``\{`` and ``\}`` aside);
 - the placeholders are ``#1`` to ``#N``, for a notation of ``N`` arguments;
 - the group exists, the keys of the file and of its tables are known (a misspelled ``unit``
@@ -111,9 +140,28 @@ notation (or group) and the field; nothing is read when there is a problem. The 
    :end-before: # [errors]
    :dedent:
 
-``notation-manager check notations.toml`` runs the same checks. The checks do not compile
+``notation-manager check notations.toml`` runs the same checks, and lists the translations
+missing (an error only with ``--strict``). The checks do not compile
 the symbols: a LaTeX or Typst error in a symbol shows in the preview of the interface (Typst)
 or when the document is compiled.
+
+Languages
+---------
+
+An export is in one language: the descriptions and group titles are written in it, so that
+a document in French gets ``\notationnomenclature`` and ``notation-nomenclature()`` in
+French. The default language is exported unless another is asked for (``--language fr`` on
+the command line, the *Language* selector of the interface, ``language="fr"`` in Python). A
+translation missing in that language falls back on the default language, with a warning
+for each one; ``notation-manager check`` lists them beforehand.
+
+The symbols, units and command names do not depend on the language: ``\velocity`` is the
+same command in an English and a French document. A document in two languages (an English
+abstract in a French thesis) inputs the export of one of them.
+
+The words that the nomenclature packages write themselves are theirs to translate:
+``\usepackage[french]{nomencl}`` titles the LaTeX nomenclature *Liste des symboles*, and
+``notation-nomenclature(title: [Notations])`` changes the Typst heading.
 
 LaTeX
 -----
@@ -218,19 +266,31 @@ Graphical interface
 
 ``notation-manager gui notations.toml`` (or just ``notation-manager``) opens the interface.
 
-- On the left, the notations by group; the search field filters them on every field (name,
-  group, sort key, symbols, descriptions, units), all words matching.
+- At the top, the search field filters the notations on every field (name, group, sort key,
+  symbols, units, descriptions in every language), all words matching; the *Language*
+  selector chooses the language of the descriptions shown, of the preview and of the
+  exports.
+- On the left, the notations by group, with their description in the selected language
+  (``[en] Density`` when it falls back on the default language). The status bar counts the
+  translations missing.
 - On the right, the editor of the selected notation: its name, group, number of arguments
-  and sort key, then its symbol, description and units in LaTeX and in Typst. *Apply*
+  and sort key; its symbol and units in LaTeX and in Typst; its description in each
+  language, in LaTeX and in Typst. An empty Typst field takes the LaTeX text (and the other
+  way round), so that a text common to both formats is typed once; a language left empty
+  has no translation. *Apply*
   (Ctrl+Enter) checks the notation and applies it, or shows its problems under the editor;
   *Revert* discards the changes; *New* (Ctrl+N) and *Duplicate* start a new notation;
   *Delete* removes it. Selecting another notation with changes not applied asks whether to
   apply them.
 - Under the editor, the notation rendered by Typst as in the nomenclature (with the
   ``typst`` package), updated as you type, or the Typst error.
-- *Edit › Groups* adds, renames, retitles, reorders and deletes groups (a group with
-  notations cannot be deleted; renaming a group moves its notations).
-- *File* opens and saves notation files (Ctrl+O, Ctrl+S) and exports to LaTeX and Typst.
+- *Edit › Groups* adds, renames, retitles (in each language), reorders and deletes groups
+  (a group with notations cannot be deleted; renaming a group moves its notations).
+- *Edit › Languages* sets the languages, the default one first (``en, fr``): add one, make
+  another the default (every description and title needs a translation in it), or remove
+  one (its translations are dropped, after confirmation).
+- *File* opens and saves notation files (Ctrl+O, Ctrl+S) and exports to LaTeX and Typst, in
+  the selected language.
   Closing with unsaved changes asks whether to save them.
 
 The interface rewrites the file when it saves: comments are lost, and strings are written
@@ -241,16 +301,20 @@ Command line
 
 ``notation-manager gui [FILE]``
    Open the interface (the default command).
-``notation-manager check FILE...``
-   Check notation files; report every problem, exit with 1 if a file is invalid.
-``notation-manager list [-l {latex,typst}] FILE``
-   List the notations: name, group, symbol and description in one language.
-``notation-manager export [-l {latex,typst}] FILE OUTPUT``
-   Export a notation file; the language follows the suffix of ``OUTPUT`` (``.tex`` and
-   ``.sty``: LaTeX, ``.typ``: Typst) unless ``--language`` is given.
+``notation-manager check [--strict] FILE...``
+   Check notation files: report every problem, and list the translations missing. Exit with
+   1 if a file is invalid, or, with ``--strict``, if translations are missing.
+``notation-manager list [-f {latex,typst}] [-l LANGUAGE] FILE``
+   List the notations: name, group, symbol in a format (LaTeX by default) and description
+   in a language (the default one by default).
+``notation-manager export [-f {latex,typst}] [-l LANGUAGE] FILE OUTPUT``
+   Export a notation file. The format follows the suffix of ``OUTPUT`` (``.tex`` and
+   ``.sty``: LaTeX, ``.typ``: Typst) unless ``--format`` is given; the descriptions are in
+   the default language unless ``--language`` is given.
 
 ``-v`` logs what is read and written. The exit code is 0 on success, 1 when a file cannot
-be read, is invalid or cannot be exported, and 2 on a usage error.
+be read, is invalid or cannot be exported, and 2 on a usage error. The warnings (a
+translation missing in the language exported) go to the standard error.
 
 Python
 ------

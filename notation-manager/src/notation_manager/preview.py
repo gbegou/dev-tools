@@ -9,6 +9,7 @@ from dataclasses import replace
 
 from notation_manager.export.typst import to_typst
 from notation_manager.model import Notation, NotationSet
+from notation_manager.typing import Language
 
 __all__ = ["PreviewError", "is_available", "render"]
 
@@ -22,13 +23,15 @@ def is_available() -> bool:
     return importlib.util.find_spec("typst") is not None
 
 
-def render(notation: Notation, *, ppi: float = 144.0) -> bytes:
+def render(notation: Notation, language: Language, *, ppi: float = 144.0) -> bytes:
     """Return a PNG image of the nomenclature entry of ``notation``, rendered by Typst.
 
     Parameters
     ----------
     notation
         The notation; its group is ignored.
+    language
+        The language of the description; the first translation when it has none in it.
     ppi
         The resolution, in pixels per inch.
 
@@ -42,9 +45,12 @@ def render(notation: Notation, *, ppi: float = 144.0) -> bytes:
     import typst  # noqa: PLC0415  # optional dependency
 
     alone = replace(notation, group="")
+    languages = (*notation.description.languages,)
+    if language in languages:
+        languages = (language, *(code for code in languages if code != language))
     source = "\n".join(
         [
-            to_typst(NotationSet([alone])),
+            to_typst(NotationSet([alone], languages=languages)),
             "#set page(width: auto, height: auto, margin: 6pt, fill: white)",
             "#set text(size: 14pt)",
             "#notation-nomenclature(",

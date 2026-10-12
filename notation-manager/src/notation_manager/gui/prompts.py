@@ -2,7 +2,7 @@
 
 import tkinter as tk
 from pathlib import Path
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, simpledialog
 
 __all__ = ["FileTypes", "Prompts"]
 
@@ -25,6 +25,10 @@ class Prompts:
     def confirm(self, message: str) -> bool:
         """Ask to confirm an action."""
         return messagebox.askokcancel("Confirm", message, parent=self.parent)
+
+    def ask_text(self, title: str, message: str, initial: str = "") -> str | None:
+        """Ask for a line of text; ``None`` when cancelled."""
+        return simpledialog.askstring(title, message, initialvalue=initial, parent=self.parent)
 
     def error(self, message: str) -> None:
         """Show an error."""

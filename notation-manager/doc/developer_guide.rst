@@ -7,15 +7,17 @@ Layout
 .. code-block:: text
 
    src/notation_manager/
-       model.py          Rendered, Notation, Group, NotationSet: validation and editing
+       model.py          Rendered, Translated, Notation, Group, NotationSet: validation and
+                         editing
        io.py             notation files (TOML): read, write, to and from dicts
+       export/_common.py the language of an export
        export/latex.py   LaTeX export (commands, nomencl entries)
        export/typst.py   Typst export (variables and functions, nomenclature)
        preview.py        Typst rendering of a notation (optional typst package)
        cli.py            command line
        gui/              Tkinter interface: app (main window), groups (group editor),
                          form (the logic without a display), prompts (dialogs)
-       typing.py         types for clients (Language)
+       typing.py         types for clients (Format, Language)
        logging.py        get_logger
    test/                 test_*.py, and snippet_*.py included in the documentation
    examples/             the example notation file and documents (tested and documented)
@@ -24,6 +26,11 @@ Layout
 Conventions
 -----------
 
+- Two words are kept apart: a **format** is LaTeX or Typst
+  (:data:`~notation_manager.typing.Format`, ``fmt`` in code, ``--format``), a **language**
+  is a natural language (:data:`~notation_manager.typing.Language`, a code like ``fr``,
+  ``--language``). A text per format is a :class:`~notation_manager.model.Rendered`, a text
+  per language a :class:`~notation_manager.model.Translated` of them.
 - Python 3.12 or later, no runtime dependency; ``typst`` is the optional ``preview`` extra.
   Type aliases are ``type X = ...`` statements.
 - ruff (lint and format) and basedpyright (its default, strict, configuration): 0 errors,

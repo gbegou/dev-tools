@@ -1,47 +1,49 @@
-# Example notations: a few fluid mechanics quantities.
+# Example notations: a few fluid mechanics quantities, in English and French.
 version = 1
+languages = ["en", "fr"]  # the first one is the default language
 
 [groups.latin]
-title = "Latin symbols"
+title = { en = "Latin symbols", fr = "Symboles latins" }
 
 [groups.greek]
-title = { latex = 'Greek symbols', typst = 'Greek symbols' }
+title = { en = "Greek symbols", fr = "Symboles grecs" }
 
 [groups.operators]
-title = "Operators"
+title = { en = "Operators", fr = "Opérateurs" }
 
 [notations.velocity]
 group = "latin"
 symbol = { latex = '\mathbf{u}', typst = 'bold(upright(u))' }
-description = "Velocity"
+description = { en = "Velocity", fr = "Vitesse" }
 units = { latex = '\si{\metre\per\second}', typst = 'm/s' }
 
 [notations.pressure]
 group = "latin"
 symbol = 'p'
-description = "Static pressure"
+description = { en = "Static pressure", fr = "Pression statique" }
 units = { latex = '\si{\pascal}', typst = 'Pa' }
 
 [notations.density]
 group = "greek"
 sort = "rho"
 symbol = { latex = '\rho', typst = 'rho' }
-description = "Density"
+description = { en = "Density", fr = "Masse volumique" }
 units = { latex = '\si{\kilogram\per\cubic\metre}', typst = 'kg/m#super[3]' }
 
 [notations.viscosity]
 group = "greek"
 sort = "mu"
 symbol = { latex = '\mu', typst = 'mu' }
-description = { latex = 'Dynamic viscosity', typst = 'Dynamic viscosity' }
+description = { en = "Dynamic viscosity", fr = "Viscosité dynamique" }
 units = { latex = '\si{\pascal\second}', typst = 'Pa s' }
 
 [notations.norm]
 group = "operators"
 arguments = 1
 symbol = { latex = '\left\lVert #1 \right\rVert', typst = 'lr(|| #1 ||)' }
-description = { latex = 'Euclidean norm', typst = 'Euclidean norm' }
+description = { en = "Euclidean norm", fr = "Norme euclidienne" }
 
 [notations.reynolds]
 symbol = { latex = '\mathit{Re}', typst = 'italic("Re")' }
-description = { latex = 'Reynolds number, $\rho U L / \mu$', typst = 'Reynolds number, $rho U L \/ mu$' }
+description.en = { latex = 'Reynolds number, $\rho U L / \mu$', typst = 'Reynolds number, $rho U L \/ mu$' }
+description.fr = { latex = 'Nombre de Reynolds, $\rho U L / \mu$', typst = 'Nombre de Reynolds, $rho U L \/ mu$' }

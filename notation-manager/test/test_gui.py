@@ -2,11 +2,11 @@
 
 from collections.abc import Iterator
 from pathlib import Path
-from typing import final, override
+from typing import cast, final, override
 
 import pytest
 
-from notation_manager import NotationSet, load, preview
+from notation_manager import NotationSet, Translated, load, preview
 
 try:
     import tkinter as tk
@@ -28,6 +28,7 @@ class ScriptedPrompts(Prompts):
         self.save_answer: bool | None = True
         self.confirm_answer = True
         self.path: Path | None = None
+        self.text: str | None = None
         self.asked: list[str] = []
         self.errors: list[str] = []
 
@@ -40,6 +41,11 @@ class ScriptedPrompts(Prompts):
     def confirm(self, message: str) -> bool:
         self.asked.append(message)
         return self.confirm_answer
+
+    @override
+    def ask_text(self, title: str, message: str, initial: str = "") -> str | None:
+        self.asked.append(initial)
+        return self.text
 
     @override
     def error(self, message: str) -> None:
@@ -78,9 +84,13 @@ def prompts(app: NotationApp) -> ScriptedPrompts:
 
 
 def edit(app: NotationApp, **fields: str) -> None:
-    """Type in the editor: the changes are not applied."""
+    """Type in the editor: the changes are not applied.
+
+    ``symbol_latex`` is the field ``symbol:latex``, ``description_fr_typst`` the field
+    ``description:fr:typst``.
+    """
     for name, value in fields.items():
-        app.fields[name].set(value)
+        app.fields[name.replace("_", ":")].set(value)
 
 
 def tree_names(app: NotationApp) -> list[str]:
@@ -109,11 +119,11 @@ def test_select_shows_the_notation(app: NotationApp, root: tk.Tk) -> None:
 
 def test_apply_edits_and_renames(app: NotationApp, root: tk.Tk) -> None:
     app.show("density")
-    edit(app, name="rho", description_typst="Mass density")
+    edit(app, name="rho", description_en_typst="Mass density")
     assert app.form_modified
     assert app.apply()
     assert "density" not in app.notations
-    assert app.notations["rho"].description.typst == "Mass density"
+    assert app.notations["rho"].description["en"].typst == "Mass density"
     assert app.dirty
     assert root.title().startswith("*notations.toml")
     assert app.tree.selection() == ("notation:rho",)
@@ -134,7 +144,7 @@ def test_new_notation(app: NotationApp) -> None:
     assert app.current is None
     assert app.read_form() == NotationForm(group="latin")
     edit(app, name="pressure", symbol_latex="p", symbol_typst="p")
-    edit(app, description_latex="Pressure", description_typst="Pressure")
+    edit(app, description_en_latex="Pressure", description_fr_latex="Pression")
     assert app.apply()
     assert app.notations["pressure"].group == "latin"
     assert "pressure" in tree_names(app)
@@ -142,7 +152,7 @@ def test_new_notation(app: NotationApp) -> None:
 
 def test_unapplied_changes_are_settled(app: NotationApp, root: tk.Tk) -> None:
     app.show("velocity")
-    edit(app, description_latex="Speed")
+    edit(app, description_en_latex="Speed")
     prompts(app).save_answer = None  # cancel: stay on velocity
     app.tree.selection_set("notation:time")
     root.update()
@@ -152,12 +162,12 @@ def test_unapplied_changes_are_settled(app: NotationApp, root: tk.Tk) -> None:
     app.tree.selection_set("notation:time")
     root.update()
     assert app.current == "time"
-    assert app.notations["velocity"].description.latex == "Speed"
+    assert app.notations["velocity"].description["en"].latex == "Speed"
     app.show("time")
-    edit(app, description_latex="Duration")
+    edit(app, description_en_latex="Duration")
     prompts(app).save_answer = False  # discard
     app.new_notation()
-    assert app.notations["time"].description.latex == "Time"
+    assert app.notations["time"].description["en"].latex == "Time"
 
 
 def test_duplicate(app: NotationApp) -> None:
@@ -165,7 +175,7 @@ def test_duplicate(app: NotationApp) -> None:
     app.duplicate()
     assert app.current is None
     assert app.read_form().name == ""
-    assert app.read_form().symbol_typst == "bold(u)"
+    assert app.read_form().symbol == (r"\mathbf{u}", "bold(u)")
     edit(app, name="speed")
     assert app.apply()
     assert app.notations["speed"].symbol == app.notations["velocity"].symbol
@@ -192,7 +202,7 @@ def test_search(app: NotationApp) -> None:
 
 def test_save_open_export(app: NotationApp, tmp_path: Path) -> None:
     app.show("time")
-    edit(app, description_latex="Duration", description_typst="Duration")
+    edit(app, description_en_latex="Duration")
     assert app.save()  # applies the editor first
     assert not app.dirty
     assert load(tmp_path / "notations.toml") == app.notations
@@ -202,7 +212,7 @@ def test_save_open_export(app: NotationApp, tmp_path: Path) -> None:
     app.new_file()
     assert len(app.notations) == 0
     assert app.open(tmp_path / "notations.toml")
-    assert app.notations["time"].description.latex == "Duration"
+    assert app.notations["time"].description["en"].latex == "Duration"
 
 
 def test_save_as_and_errors(app: NotationApp, tmp_path: Path) -> None:
@@ -218,7 +228,7 @@ def test_save_as_and_errors(app: NotationApp, tmp_path: Path) -> None:
 
 def test_quit_asks_to_save(app: NotationApp, root: tk.Tk) -> None:
     app.show("time")
-    edit(app, description_latex="Duration")
+    edit(app, description_en_latex="Duration")
     prompts(app).save_answer = None
     app.quit()  # cancelled: the window stays
     assert root.winfo_exists()
@@ -241,17 +251,17 @@ def test_groups_dialog(app: NotationApp, root: tk.Tk) -> None:
     dialog = GroupsDialog(root, app.notations)
 
     def fill(form: GroupForm) -> None:
-        for name, value in form.values().items():
+        for name, value in form.values(app.notations.languages).items():
             dialog.fields[name].set(value)
 
-    fill(GroupForm("ops", "Operators", "Operators"))
+    fill(GroupForm("ops", {"en": ("Operators", ""), "fr": ("Opérateurs", "")}))
     assert dialog.apply()
     dialog.move(-5)
     assert [g.key for g in app.notations.groups] == ["ops", "latin", "greek"]
     dialog.show("greek")
-    fill(GroupForm("grec", "Grec", "Grec"))
+    fill(GroupForm("grec", {"en": ("Greek", ""), "fr": ("Grec", "")}))
     assert dialog.apply()
-    fill(GroupForm("bad key", "", ""))
+    fill(GroupForm("bad key", {"fr": ("Mauvais", "")}))
     assert not dialog.apply()
     dialog.delete()  # used by density: refused
     assert "still used" in dialog.problems.get()
@@ -262,3 +272,63 @@ def test_groups_dialog(app: NotationApp, root: tk.Tk) -> None:
     assert [g.key for g in app.notations.groups] == ["latin", "grec"]
     assert app.read_form().group == "grec"
     assert app.dirty
+
+
+def descriptions(app: NotationApp) -> list[str]:
+    return [
+        cast(str, app.tree.set(child, "description"))
+        for group in app.tree.get_children()
+        for child in app.tree.get_children(group)
+    ]
+
+
+def test_display_language(app: NotationApp, tmp_path: Path) -> None:
+    assert descriptions(app) == ["Time", "Norm", "Velocity", "Density"]
+    app.language.set("fr")
+    app.refresh_tree()
+    assert descriptions(app) == ["Temps", "[en] Norm", "Vitesse", "[en] Density"]
+    assert app.export("typst", tmp_path / "notations.typ")
+    assert "[Vitesse]" in (tmp_path / "notations.typ").read_text(encoding="utf-8")
+
+
+def test_translate(app: NotationApp) -> None:
+    app.show("density")
+    assert app.fields["description:fr:latex"].get() == ""
+    edit(app, description_fr_latex="Masse volumique")
+    assert app.apply()
+    assert app.notations["density"].description == Translated(
+        {"en": "Density", "fr": "Masse volumique"}
+    )
+    assert app.notations.missing_translations() == ["notation 'norm': description is missing in fr"]
+
+
+def test_default_language_is_required(app: NotationApp) -> None:
+    app.show("time")
+    edit(app, description_en_latex="")
+    assert not app.apply()
+    assert "missing in the default language en" in app.problems.get()
+
+
+def test_edit_languages(app: NotationApp) -> None:
+    prompts(app).text = None  # cancelled
+    app.edit_languages()
+    assert prompts(app).asked == ["en, fr"]
+    prompts(app).text = "en fr de"
+    app.edit_languages()
+    assert app.notations.languages == ("en", "fr", "de")
+    assert "description:de:typst" in app.fields
+    assert app.dirty
+    prompts(app).text = "fr, en"  # density has no French description
+    app.edit_languages()
+    assert app.notations.languages == ("en", "fr", "de")
+    assert "missing in the new default language fr" in prompts(app).errors[-1]
+    prompts(app).text = "en"
+    prompts(app).confirm_answer = False  # keep the French translations
+    app.edit_languages()
+    assert app.notations.languages == ("en", "fr", "de")
+    prompts(app).confirm_answer = True
+    app.edit_languages()
+    assert app.notations.languages == ("en",)
+    assert "description:fr:latex" not in app.fields
+    assert app.notations["velocity"].description == Translated({"en": "Velocity"})
+    assert cast(tuple[str, ...], app.language_box.cget("values")) == ("en",)

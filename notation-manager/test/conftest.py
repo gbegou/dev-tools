@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from notation_manager import Group, Notation, NotationSet, Rendered, load
+from notation_manager import Group, Notation, NotationSet, Rendered, Translated, load
 
 ROOT = Path(__file__).resolve().parent.parent
 EXAMPLE = ROOT / "examples" / "notations.toml"
@@ -12,30 +12,37 @@ EXAMPLE = ROOT / "examples" / "notations.toml"
 
 @pytest.fixture
 def example() -> NotationSet:
-    """The notations of ``examples/notations.toml``."""
+    """The notations of ``examples/notations.toml`` (in English and French)."""
     return load(EXAMPLE)
 
 
 @pytest.fixture
 def small() -> NotationSet:
-    """Two groups, an ungrouped notation and a notation with an argument."""
+    """English and French; two groups, an ungrouped notation, a notation with an argument,
+    and descriptions not translated in French (``density``, ``norm``)."""
     return NotationSet(
         [
             Notation(
                 "velocity",
                 Rendered(r"\mathbf{u}", "bold(u)"),
-                Rendered.both("Velocity"),
+                Translated({"en": "Velocity", "fr": "Vitesse"}),
                 Rendered(r"\si{m/s}", "m/s"),
                 group="latin",
             ),
-            Notation("density", Rendered(r"\rho", "rho"), Rendered.both("Density"), group="greek"),
-            Notation("time", Rendered.both("t"), Rendered.both("Time")),
+            Notation(
+                "density", Rendered(r"\rho", "rho"), Translated({"en": "Density"}), group="greek"
+            ),
+            Notation("time", Rendered.both("t"), Translated({"en": "Time", "fr": "Temps"})),
             Notation(
                 "norm",
                 Rendered(r"\lVert #1 \rVert", "norm(#1)"),
-                Rendered.both("Norm"),
+                Translated({"en": "Norm"}),
                 arguments=1,
             ),
         ],
-        [Group("latin", Rendered.both("Latin")), Group("greek", Rendered.both("Greek"))],
+        [
+            Group("latin", Translated({"en": "Latin", "fr": "Latin"})),
+            Group("greek", Translated({"en": "Greek", "fr": "Grec"})),
+        ],
+        languages=("en", "fr"),
     )

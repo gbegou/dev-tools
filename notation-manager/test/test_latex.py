@@ -6,7 +6,15 @@ from pathlib import Path
 
 import pytest
 
-from notation_manager import Group, Notation, NotationError, NotationSet, Rendered, to_latex
+from notation_manager import (
+    Group,
+    Notation,
+    NotationError,
+    NotationSet,
+    Rendered,
+    Translated,
+    to_latex,
+)
 from notation_manager.export.latex import MAX_GROUPS
 
 
@@ -35,22 +43,22 @@ def test_group_titles(small: NotationSet) -> None:
 
 
 def test_without_groups() -> None:
-    notations = NotationSet([Notation("time", Rendered.both("t"), Rendered.both("Time"))])
+    notations = NotationSet([Notation("time", Rendered.both("t"), Translated({"en": "Time"}))])
     text = to_latex(notations, source="notations.toml")
-    assert "from notations.toml" in text
+    assert "from notations.toml, in en" in text
     assert r"\nomgroup" not in text
     assert r"\nomenclature[time]{$\time$}{Time}%" in text
 
 
 def test_too_many_groups() -> None:
     count = MAX_GROUPS + 1
-    groups = [Group(f"g{i}", Rendered.both(f"G{i}")) for i in range(count)]
+    groups = [Group(f"g{i}", Translated({"en": f"G{i}"})) for i in range(count)]
     notations = NotationSet(
         [
             Notation(
                 f"n{chr(97 + i // 26)}{chr(97 + i % 26)}",
                 Rendered.both("x"),
-                Rendered.both("x"),
+                Translated({"en": "x"}),
                 group=f"g{i}",
             )
             for i in range(count)
@@ -61,6 +69,28 @@ def test_too_many_groups() -> None:
         _ = to_latex(notations)
     _ = notations.remove("naa")
     assert r"\@namedef{notation@group@Z}" in to_latex(notations)
+
+
+def test_language(small: NotationSet, caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level("WARNING", logger="notation_manager"):
+        text = to_latex(small, language="fr")
+    assert r"\@namedef{notation@group@C}{Grec}" in text
+    assert r"{$\velocity$}{Vitesse\nomunit{\si{m/s}}}%" in text
+    assert r"{$\density$}{Density}%" in text  # no French translation: English
+    assert caplog.messages == [
+        "notation 'density': description is missing in fr: the export uses the default "
+        + "language en",
+        "notation 'norm': description is missing in fr: the export uses the default language en",
+    ]
+    assert to_latex(small) == to_latex(small, language="en")
+    with pytest.raises(NotationError, match="language 'de' is not declared"):
+        _ = to_latex(small, language="de")
+
+
+def test_descriptions_per_format() -> None:
+    description = Translated({"en": Rendered(r"\emph{Time}", "_Time_")})
+    text = to_latex(NotationSet([Notation("time", Rendered.both("t"), description)]))
+    assert r"{$\time$}{\emph{Time}}%" in text
 
 
 EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
@@ -78,8 +108,12 @@ def latex_available() -> bool:
 
 
 @pytest.mark.skipif(not latex_available(), reason="needs pdflatex, makeindex, nomencl, siunitx")
-def test_document_compiles(tmp_path: Path, example: NotationSet) -> None:
-    _ = (tmp_path / "notations.tex").write_text(to_latex(example), encoding="utf-8")
+@pytest.mark.parametrize(
+    ("language", "title"), [("en", "Latin symbols"), ("fr", "Symboles latins")]
+)
+def test_document_compiles(tmp_path: Path, example: NotationSet, language: str, title: str) -> None:
+    text = to_latex(example, language=language)
+    _ = (tmp_path / "notations.tex").write_text(text, encoding="utf-8")
     _ = shutil.copy(EXAMPLES / "document.tex", tmp_path)
 
     def run(*command: str) -> None:
@@ -106,3 +140,4 @@ def test_document_compiles(tmp_path: Path, example: NotationSet) -> None:
     ]
     positions = [listing.index(item) for item in order]
     assert positions == sorted(positions)
+    assert title in (tmp_path / "notations.tex").read_text(encoding="utf-8")

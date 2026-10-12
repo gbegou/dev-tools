@@ -10,6 +10,7 @@ from notation_manager import (
     NotationError,
     NotationSet,
     Rendered,
+    Translated,
     dumps,
     from_dict,
     load,
@@ -29,7 +30,10 @@ def test_example_loads(example: NotationSet) -> None:
     assert len(example) == 6
     assert [g.key for g in example.groups] == ["latin", "greek", "operators"]
     assert example["velocity"].symbol == Rendered(r"\mathbf{u}", "bold(upright(u))")
-    assert example["velocity"].description == Rendered.both("Velocity")
+    assert example.languages == ("en", "fr")
+    assert example["velocity"].description == Translated({"en": "Velocity", "fr": "Vitesse"})
+    assert example["reynolds"].description["fr"].typst == "Nombre de Reynolds, $rho U L \\/ mu$"
+    assert example.group("operators").title["fr"] == Rendered.both("Opérateurs")
     assert example["norm"].arguments == 1
     assert example["density"].sort == "rho"
 
@@ -42,7 +46,7 @@ def test_round_trip(example: NotationSet, small: NotationSet) -> None:
 def test_round_trip_of_awkward_strings() -> None:
     texts = ["it's", 'say "hi"', "a\\b", "tab\there", "line\nbreak", "ünïcode ∇", "\x01"]
     notations = NotationSet(
-        Notation(f"n{chr(97 + i)}", Rendered.both("x"), Rendered(text, "y"))
+        Notation(f"n{chr(97 + i)}", Rendered(text, "y"), Translated({"en": Rendered(text, "z")}))
         for i, text in enumerate(texts)
     )
     text = dumps(notations)
@@ -52,10 +56,11 @@ def test_round_trip_of_awkward_strings() -> None:
 
 def test_dumps_is_readable() -> None:
     notations = NotationSet(
-        [Notation("velocity", Rendered(r"\mathbf{u}", "bold(u)"), Rendered.both("Velocity"))]
+        [Notation("velocity", Rendered(r"\mathbf{u}", "bold(u)"), Translated({"en": "Velocity"}))]
     )
     assert dumps(notations) == (
         "version = 1\n"
+        "languages = ['en']\n"
         "\n"
         "[notations.velocity]\n"
         "symbol = { latex = '\\mathbf{u}', typst = 'bold(u)' }\n"
@@ -67,8 +72,35 @@ def test_to_dict_leaves_defaults_out(small: NotationSet) -> None:
     data = to_dict(small)
     notations = data["notations"]
     assert isinstance(notations, dict)
-    assert notations["time"] == {"symbol": "t", "description": "Time"}
+    assert notations["time"] == {"symbol": "t", "description": {"en": "Time", "fr": "Temps"}}
+    assert notations["density"]["description"] == {"en": "Density"}
     assert from_dict(data) == small
+
+
+def test_one_language_writes_strings() -> None:
+    notations = loads(
+        "[notations.velocity]\nsymbol = 'u'\ndescription = 'Velocity'\n"
+        + "[notations.speed]\nsymbol = 'v'\n"
+        + "description = { latex = '\\emph{Speed}', typst = '_Speed_' }\n"
+    )
+    assert notations.languages == ("en",)
+    data = to_dict(notations)["notations"]
+    assert isinstance(data, dict)
+    assert data["velocity"] == {"symbol": "u", "description": "Velocity"}
+    assert data["speed"] == {
+        "symbol": "v",
+        "description": {"latex": "\\emph{Speed}", "typst": "_Speed_"},
+    }
+    assert loads(dumps(notations)) == notations
+
+
+def test_strings_are_in_the_default_language() -> None:
+    notations = loads(
+        "languages = ['fr', 'en']\n[groups.g]\ntitle = 'Groupe'\n"
+        + "[notations.ab]\nsymbol = 'x'\ndescription = 'Vitesse'\ngroup = 'g'\n"
+    )
+    assert notations["ab"].description == Translated({"fr": "Vitesse"})
+    assert notations.group("g").title == Translated({"fr": "Groupe"})
 
 
 def test_save_and_load(tmp_path: Path, small: NotationSet) -> None:
@@ -105,7 +137,10 @@ def test_every_problem_is_reported() -> None:
         titel = "Latin"
 
         [groups.greek]
-        title = { latex = "Greek", typst = 3 }
+        title = { en = { latex = "Greek", typst = 3 } }
+
+        [groups.ops]
+        title = { en = "Operators", latex = "Ops" }
 
         [notations.velocity]
         group = "latin"
@@ -121,22 +156,30 @@ def test_every_problem_is_reported() -> None:
 
         [notations.density]
         description = "Density"
+
+        [notations.viscosity]
+        symbol = 'mu'
+        description = 1
         """
     )
     assert found == (
-        "file: unknown key(s) colour (expected version, groups, notations)",
+        "file: unknown key(s) colour (expected version, languages, groups, notations)",
         "group 'latin': unknown key(s) titel (expected title)",
         "group 'latin': title is missing",
-        "group 'greek': title.typst must be a string",
+        "group 'greek': title.en.typst must be a string",
+        "group 'ops': title mixes languages and formats: "
+        + "write title.<language> = { latex = ..., typst = ... }",
         "notation 'velocity': unknown key(s) unit "
         + "(expected group, arguments, sort, symbol, description, units)",
-        "notation 'velocity': symbol has unknown language(s) html (expected latex, typst)",
+        "notation 'velocity': symbol has unknown format(s) html (expected latex, typst)",
         "notation 'pressure': description is missing",
         "notation 'pressure': group must be a string",
         "notation 'pressure': sort must be a string",
         "notation 'pressure': arguments must be an integer",
         "notation 'pressure': symbol must be a string or a table with keys latex and typst",
         "notation 'density': symbol is missing",
+        "notation 'viscosity': description must be a string or a table with one entry per "
+        + "language",
     )
 
 
@@ -156,3 +199,18 @@ def test_boolean_arguments_are_rejected() -> None:
 
 def test_empty_file() -> None:
     assert loads("") == NotationSet()
+
+
+def test_languages_must_be_a_list_of_codes() -> None:
+    assert problems("languages = 'en'") == (
+        'languages: must be a list of language codes, like ["en", "fr"]',
+    )
+    assert problems("languages = ['en', 'EN']") == (
+        "languages: invalid language code 'EN' (expected a code like en, fr or pt-BR)",
+    )
+
+
+def test_undeclared_languages() -> None:
+    assert problems("[notations.ab]\nsymbol = 'x'\ndescription = { en = 'a', de = 'b' }") == (
+        "notation 'ab': description is in de, which is not a declared language (en)",
+    )

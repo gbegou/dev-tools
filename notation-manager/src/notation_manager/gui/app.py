@@ -1,6 +1,7 @@
 """The main window: a searchable tree of notations, an editor, a Typst preview."""
 
 import base64
+import re
 import tkinter as tk
 from pathlib import Path
 from tkinter import ttk
@@ -8,24 +9,26 @@ from typing import final
 
 from notation_manager import preview
 from notation_manager.export import export
-from notation_manager.gui.form import NotationForm, matches
+from notation_manager.gui.form import NotationForm, description_key, matches
 from notation_manager.gui.groups import GroupsDialog
 from notation_manager.gui.prompts import FileTypes, Prompts
 from notation_manager.io import load, save
 from notation_manager.model import NotationError, NotationSet
-from notation_manager.typing import LANGUAGES, Language
+from notation_manager.typing import FORMATS, Format
 
 __all__ = ["NotationApp"]
 
 NOTATION_FILES: FileTypes = [("Notation files", "*.toml"), ("All files", "*")]
-EXPORT_FILES: dict[Language, FileTypes] = {
+EXPORT_FILES: dict[Format, FileTypes] = {
     "latex": [("LaTeX", "*.tex"), ("All files", "*")],
     "typst": [("Typst", "*.typ"), ("All files", "*")],
 }
-LANGUAGE_NAMES: dict[Language, str] = {"latex": "LaTeX", "typst": "Typst"}
+FORMAT_NAMES: dict[Format, str] = {"latex": "LaTeX", "typst": "Typst"}
 NO_GROUP = "(no group)"
 PREVIEW_DELAY_MS = 400
 _ERROR_COLOR = "#b00020"
+_DESCRIPTION_ROW = 8  # the first row of the descriptions in the editor grid
+_BUTTONS_ROW = 100  # below the descriptions, however many languages there are
 
 
 @final
@@ -49,7 +52,9 @@ class NotationApp:
         Whether the notations have changes that are not saved.
     fields
         The variables of the editor fields, by field name of
-        :class:`~notation_manager.gui.form.NotationForm`.
+        :meth:`~notation_manager.gui.form.NotationForm.values`.
+    language
+        The variable of the language shown in the tree and the preview, and exported.
     search
         The variable of the search field.
     problems
@@ -67,32 +72,38 @@ class NotationApp:
         self.dirty = False
         self.prompts = Prompts(root)
         self.current: str | None = None
-        self._loaded = NotationForm()
-        self.fields = {name: tk.StringVar(root) for name in NotationForm().values()}
+        self._loaded: dict[str, str] = {}
+        self.fields = {name: tk.StringVar(root) for name in NotationForm().values(())}
+        self.language = tk.StringVar(root, value=self.notations.default_language)
         self.search = tk.StringVar(root)
         self._status = tk.StringVar(root)
         self.problems = tk.StringVar(root)
         self.preview_image: tk.PhotoImage | None = None
         self._preview_job: str | None = None
+        self._description_widgets: list[tk.Widget] = []
 
-        root.minsize(900, 540)
+        root.minsize(980, 560)
         root.protocol("WM_DELETE_WINDOW", self.quit)
         self._build_menu()
         top = ttk.Frame(root, padding=(8, 8, 8, 0))
         top.pack(fill="x")
         ttk.Label(top, text="Search").pack(side="left")
         self.search_entry = ttk.Entry(top, textvariable=self.search)
-        self.search_entry.pack(side="left", fill="x", expand=True, padx=(6, 0))
+        self.search_entry.pack(side="left", fill="x", expand=True, padx=(6, 12))
+        ttk.Label(top, text="Language").pack(side="left")
+        self.language_box = ttk.Combobox(top, textvariable=self.language, state="readonly", width=8)
+        self.language_box.pack(side="left", padx=(6, 0))
+        _ = self.language_box.bind("<<ComboboxSelected>>", lambda _event: self._language_changed())
         panes = ttk.PanedWindow(root, orient="horizontal")
         panes.pack(fill="both", expand=True, padx=8, pady=8)
         tree_frame = ttk.Frame(panes)
-        editor_frame = ttk.Frame(panes, padding=(8, 0, 0, 0))
+        self.editor = ttk.Frame(panes, padding=(8, 0, 0, 0))
         # typeshed leaves the pane options untyped.
         panes.add(tree_frame, weight=1)  # pyright: ignore[reportUnknownMemberType]
-        panes.add(editor_frame, weight=1)  # pyright: ignore[reportUnknownMemberType]
+        panes.add(self.editor, weight=1)  # pyright: ignore[reportUnknownMemberType]
         self.tree = self._build_tree(tree_frame)
         self.heading, self.name_entry, self.group_box, self.preview_label = self._build_editor(
-            editor_frame
+            self.editor
         )
         ttk.Label(root, textvariable=self._status, anchor="w", padding=(8, 0, 8, 4)).pack(fill="x")
 
@@ -108,6 +119,7 @@ class NotationApp:
             _ = var.trace_add("write", self._on_form_write)
         _ = self.search.trace_add("write", self._on_search_write)
 
+        self._build_descriptions()
         self.write_form(NotationForm())
         self.refresh_tree()
         self._update_title()
@@ -122,10 +134,10 @@ class NotationApp:
         file.add_command(label="Save", accelerator="Ctrl+S", command=self.save)
         file.add_command(label="Save as…", command=self.save_as)
         file.add_separator()
-        for language in LANGUAGES:
+        for fmt in FORMATS:
             file.add_command(
-                label=f"Export to {LANGUAGE_NAMES[language]}…",
-                command=lambda language=language: self.export(language),
+                label=f"Export to {FORMAT_NAMES[fmt]}…",
+                command=lambda fmt=fmt: self.export(fmt),
             )
         file.add_separator()
         file.add_command(label="Quit", command=self.quit)
@@ -138,6 +150,7 @@ class NotationApp:
         edit.add_command(label="Delete notation", command=self.delete)
         edit.add_separator()
         edit.add_command(label="Groups…", command=self.edit_groups)
+        edit.add_command(label="Languages…", command=self.edit_languages)
         menu.add_cascade(label="Edit", menu=edit)
         _ = self.root.configure(menu=menu)
 
@@ -189,21 +202,21 @@ class NotationApp:
             row=4, column=1, columnspan=2, sticky="ew", pady=2, padx=2
         )
 
-        for column, language in enumerate(LANGUAGES, start=1):
-            ttk.Label(frame, text=LANGUAGE_NAMES[language], font="TkHeadingFont").grid(
-                row=5, column=column, sticky="w", pady=(10, 2), padx=2
-            )
-        for row, (text, field) in enumerate(
-            [("Symbol", "symbol"), ("Description", "description"), ("Units", "units")], start=6
-        ):
+        ttk.Label(frame, text="LaTeX", font="TkHeadingFont").grid(
+            row=5, column=1, sticky="w", pady=(10, 2), padx=2
+        )
+        ttk.Label(frame, text="Typst (empty: as LaTeX)", font="TkHeadingFont").grid(
+            row=5, column=2, sticky="w", pady=(10, 2), padx=2
+        )
+        for row, (text, field) in enumerate([("Symbol", "symbol"), ("Units", "units")], start=6):
             label(row, text)
-            for column, language in enumerate(LANGUAGES, start=1):
-                ttk.Entry(frame, textvariable=self.fields[f"{field}_{language}"]).grid(
+            for column, fmt in enumerate(FORMATS, start=1):
+                ttk.Entry(frame, textvariable=self.fields[f"{field}:{fmt}"]).grid(
                     row=row, column=column, sticky="ew", pady=2, padx=2
                 )
 
         buttons = ttk.Frame(frame)
-        buttons.grid(row=9, column=0, columnspan=3, sticky="ew", pady=(10, 4))
+        buttons.grid(row=_BUTTONS_ROW, column=0, columnspan=3, sticky="ew", pady=(10, 4))
         for text, command in [
             ("Apply", self.apply),
             ("Revert", self.revert),
@@ -214,26 +227,54 @@ class NotationApp:
             ttk.Button(buttons, text=text, command=command).pack(side="left", padx=(0, 4))
 
         ttk.Label(frame, textvariable=self.problems, foreground=_ERROR_COLOR, justify="left").grid(
-            row=10, column=0, columnspan=3, sticky="w"
+            row=_BUTTONS_ROW + 1, column=0, columnspan=3, sticky="w"
         )
         preview_frame = ttk.LabelFrame(frame, text="Preview (Typst)", padding=6)
-        preview_frame.grid(row=11, column=0, columnspan=3, sticky="nsew", pady=(6, 0))
-        _ = frame.rowconfigure(11, weight=1)
+        preview_frame.grid(row=_BUTTONS_ROW + 2, column=0, columnspan=3, sticky="nsew", pady=6)
+        _ = frame.rowconfigure(_BUTTONS_ROW + 2, weight=1)
         preview_label = ttk.Label(preview_frame, anchor="nw", justify="left", wraplength=420)
         preview_label.pack(fill="both", expand=True)
         return heading, name_entry, group_box, preview_label
 
+    def _build_descriptions(self) -> None:
+        """(Re)build the description rows of the editor: one per language."""
+        for widget in self._description_widgets:
+            widget.destroy()
+        self._description_widgets = []
+        for name in [name for name in self.fields if name.startswith("description:")]:
+            del self.fields[name]
+        for row, language in enumerate(self.notations.languages, start=_DESCRIPTION_ROW):
+            default = " — default" if language == self.notations.default_language else ""
+            label = ttk.Label(self.editor, text=f"Description ({language}{default})")
+            label.grid(row=row, column=0, sticky="w", pady=2)
+            self._description_widgets.append(label)
+            for column, fmt in enumerate(FORMATS, start=1):
+                var = tk.StringVar(self.root)
+                _ = var.trace_add("write", self._on_form_write)
+                self.fields[description_key(language, fmt)] = var
+                entry = ttk.Entry(self.editor, textvariable=var)
+                entry.grid(row=row, column=column, sticky="ew", pady=2, padx=2)
+                self._description_widgets.append(entry)
+        languages = self.notations.languages
+        _ = self.language_box.configure(values=list(languages))
+        if self.language.get() not in languages:
+            self.language.set(self.notations.default_language)
+
     # State
+
+    def _values(self) -> dict[str, str]:
+        return {name: var.get() for name, var in self.fields.items()}
 
     def read_form(self) -> NotationForm:
         """Return the content of the editor."""
-        return NotationForm(**{name: var.get() for name, var in self.fields.items()})
+        return NotationForm.from_values(self._values())
 
     def write_form(self, form: NotationForm) -> None:
         """Show ``form`` in the editor, as its unmodified state."""
-        for name, value in form.values().items():
+        values = form.values(self.notations.languages)
+        for name, value in values.items():
             self.fields[name].set(value)
-        self._loaded = form
+        self._loaded = values
         self.problems.set("")
         title = f"Notation \\{self.current}" if self.current else "New notation"
         _ = self.heading.configure(text=title)
@@ -241,7 +282,7 @@ class NotationApp:
     @property
     def form_modified(self) -> bool:
         """Whether the editor holds changes that are not applied."""
-        return self.read_form() != self._loaded
+        return self._values() != self._loaded
 
     def _set_dirty(self, dirty: bool) -> None:
         self.dirty = dirty
@@ -258,6 +299,10 @@ class NotationApp:
 
     def _on_search_write(self, _name: str, _index: str, _mode: str) -> None:
         self.refresh_tree()
+
+    def _language_changed(self) -> None:
+        self.refresh_tree()
+        self.update_preview()
 
     def _settle_form(self) -> bool:
         """Settle the changes in the editor before it shows something else.
@@ -291,9 +336,13 @@ class NotationApp:
     def refresh_tree(self, select: str | None = None) -> None:
         """Rebuild the tree from the notations, filtered by the search.
 
-        Select the notation ``select``, the one in the editor by default.
+        The descriptions are shown in the selected language, or in the default one (marked)
+        when they have no translation in it. Select the notation ``select``, the one in the
+        editor by default.
         """
         select = select if select is not None else self.current
+        language, default = self.language.get(), self.notations.default_language
+        _ = self.tree.heading("description", text=f"Description ({language})")
         self.tree.delete(*self.tree.get_children())
         query = self.search.get()
         shown = [notation for notation in self.notations if matches(notation, query)]
@@ -304,12 +353,15 @@ class NotationApp:
                 continue
             parent = self.tree.insert("", "end", iid=f"group:{key}", text=text, open=True)
             for notation in members:
+                description = notation.description.resolve(language, default).latex
+                if language not in notation.description:
+                    description = f"[{default}] {description}"
                 _ = self.tree.insert(
                     parent,
                     "end",
                     iid=f"notation:{notation.name}",
                     text=notation.name,
-                    values=(notation.symbol.latex, notation.description.latex),
+                    values=(notation.symbol.latex, description),
                 )
         _ = self.group_box.configure(values=["", *(group.key for group in self.notations.groups)])
         item = f"notation:{select}"
@@ -318,7 +370,11 @@ class NotationApp:
             self.tree.see(item)
         else:
             self.tree.selection_set(())
-        self._status.set(f"{len(shown)} of {len(self.notations)} notations")
+        missing = len(self.notations.missing_translations())
+        self._status.set(
+            f"{len(shown)} of {len(self.notations)} notations"
+            + (f", {missing} missing translations" if missing else "")
+        )
 
     def _on_select(self) -> None:
         selection = self.tree.selection()
@@ -366,13 +422,13 @@ class NotationApp:
 
     def revert(self) -> None:
         """Discard the changes in the editor."""
-        self.write_form(self._loaded)
+        self.write_form(NotationForm.from_values(self._loaded))
 
     def new_notation(self) -> None:
         """Clear the editor for a new notation, in the group of the current one."""
         if not self._settle_form():
             return
-        group = self._loaded.group
+        group = self._loaded.get("group", "")
         self.current = None
         self.tree.selection_set(())
         self.write_form(NotationForm(group=group))
@@ -382,7 +438,7 @@ class NotationApp:
         """Start a new notation from the one in the editor; it needs a new name."""
         if not self._settle_form():
             return
-        values = self._loaded.values()
+        values = dict(self._loaded)
         self.current = None
         self.tree.selection_set(())
         self.write_form(NotationForm())
@@ -400,7 +456,7 @@ class NotationApp:
         _ = self.notations.remove(self.current)
         self.current = None
         self._set_dirty(True)
-        self.write_form(NotationForm(group=self._loaded.group))
+        self.write_form(NotationForm(group=self._loaded.get("group", "")))
         self.refresh_tree()
 
     def edit_groups(self) -> None:
@@ -418,8 +474,49 @@ class NotationApp:
             self.show(self.current)  # the group key may have changed
         self.refresh_tree()
 
+    def edit_languages(self) -> None:
+        """Ask for the languages (the default one first), and change them.
+
+        Dropping the translations of the languages removed is confirmed first.
+        """
+        if not self._settle_form():
+            return
+        answer = self.prompts.ask_text(
+            "Languages",
+            "Language codes (en, fr, de, pt-BR...), the default one first:",
+            ", ".join(self.notations.languages),
+        )
+        if answer is None:
+            return
+        languages = tuple(code for code in re.split(r"[\s,;]+", answer) if code)
+        removed = [code for code in self.notations.languages if code not in languages]
+        texts = [
+            *(notation.description for notation in self.notations),
+            *(group.title for group in self.notations.groups),
+        ]
+        dropped = sum(code in text for code in removed for text in texts)
+        if dropped and not self.prompts.confirm(
+            f"Drop the {dropped} translations in {', '.join(removed)}?"
+        ):
+            return
+        try:
+            self.notations.set_languages(languages)
+        except NotationError as error:
+            self.prompts.error(str(error))
+            return
+        self._set_dirty(True)
+        self._build_descriptions()
+        if self.current is not None:
+            self.show(self.current)
+        else:
+            self.write_form(NotationForm.from_values(self._loaded))
+        self.refresh_tree()
+
     def update_preview(self) -> None:
-        """Render the notation in the editor with Typst, or show why it cannot be rendered."""
+        """Render the notation in the editor with Typst, in the selected language.
+
+        Show why it cannot be rendered otherwise.
+        """
         self._preview_job = None
         self.preview_image = None
         if not preview.is_available():
@@ -430,7 +527,7 @@ class NotationApp:
             )
             return
         try:
-            png = preview.render(self.read_form().to_notation())
+            png = preview.render(self.read_form().to_notation(), self.language.get())
         except (NotationError, preview.PreviewError) as error:
             _ = self.preview_label.configure(image="", text=str(error))
             return
@@ -440,9 +537,9 @@ class NotationApp:
     # File actions
 
     def new_file(self) -> None:
-        """Start an empty notation set."""
+        """Start an empty notation set, in the languages of the current one."""
         if self._settle_file():
-            self._replace_set(NotationSet(), None)
+            self._replace_set(NotationSet(languages=self.notations.languages), None)
 
     def open(self, path: Path | None = None) -> bool:
         """Open a notation file (asked for when ``path`` is ``None``)."""
@@ -464,6 +561,7 @@ class NotationApp:
         self.path = path
         self.current = None
         self._set_dirty(False)
+        self._build_descriptions()
         self.write_form(NotationForm())
         self.refresh_tree()
 
@@ -490,21 +588,25 @@ class NotationApp:
         self.path = path
         return self.save()
 
-    def export(self, language: Language, path: Path | None = None) -> bool:
-        """Export to ``language``, to ``path`` (asked for when ``None``)."""
+    def export(self, fmt: Format, path: Path | None = None) -> bool:
+        """Export to the format ``fmt``, in the selected language.
+
+        Write to ``path``, asked for when ``None``; return whether it exported.
+        """
         if not self._settle_form():
             return False
-        suffix = ".tex" if language == "latex" else ".typ"
-        path = path or self.prompts.save_path(EXPORT_FILES[language], suffix)
+        suffix = ".tex" if fmt == "latex" else ".typ"
+        path = path or self.prompts.save_path(EXPORT_FILES[fmt], suffix)
         if path is None:
             return False
         source = self.path.name if self.path else None
+        language = self.language.get()
         try:
-            export(self.notations, path, language, source=source)
+            export(self.notations, path, fmt, language=language, source=source)
         except (OSError, NotationError) as error:
             self.prompts.error(str(error))
             return False
-        self._status.set(f"Exported to {path}")
+        self._status.set(f"Exported to {path} ({language})")
         return True
 
     def quit(self) -> None:

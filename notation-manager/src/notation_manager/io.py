@@ -3,18 +3,22 @@ r"""Reading and writing notation files (TOML), and conversion from and to plain 
 A notation file looks like::
 
     version = 1
+    languages = ["en", "fr"]  # the first one is the default language
 
     [groups.latin]
-    title = "Latin symbols"
+    title = { en = "Latin symbols", fr = "Symboles latins" }
 
     [notations.velocity]
     group = "latin"
     symbol = { latex = '\mathbf{u}', typst = 'bold(u)' }
-    description = "Velocity"
+    description = { en = "Velocity", fr = "Vitesse" }
     units = { latex = '\si{\metre\per\second}', typst = 'm/s' }
 
-A rendered field (``symbol``, ``description``, ``units``, ``title``) is either a string, the same
-in every language, or a table with one string per language.
+The fields written per format (``symbol``, ``units``) are a string, the same in every format,
+or a table with one string per format (``latex``, ``typst``). The fields written per language
+(``description``, ``title``) are a string or a table with one string per format, in the
+default language, or a table with one entry per language, each a string or a table with one
+string per format.
 """
 
 import tomllib
@@ -23,8 +27,15 @@ from pathlib import Path
 from typing import cast
 
 from notation_manager.logging import get_logger
-from notation_manager.model import Group, Notation, NotationError, NotationSet, Rendered
-from notation_manager.typing import LANGUAGES
+from notation_manager.model import (
+    Group,
+    Notation,
+    NotationError,
+    NotationSet,
+    Rendered,
+    Translated,
+)
+from notation_manager.typing import FORMATS, Language
 
 __all__ = ["FORMAT_VERSION", "dumps", "from_dict", "load", "loads", "save", "to_dict"]
 
@@ -33,7 +44,8 @@ FORMAT_VERSION = 1
 
 _NOTATION_KEYS = ("group", "arguments", "sort", "symbol", "description", "units")
 _GROUP_KEYS = ("title",)
-_TOP_KEYS = ("version", "groups", "notations")
+_TOP_KEYS = ("version", "languages", "groups", "notations")
+_DEFAULT_LANGUAGES = ("en",)
 
 _logger = get_logger(__name__)
 
@@ -43,22 +55,54 @@ def _rendered(owner: str, key: str, value: object, problems: list[str]) -> Rende
         return Rendered.both(value)
     if isinstance(value, Mapping):
         table = cast(Mapping[object, object], value)
-        unknown = [str(k) for k in table if k not in LANGUAGES]
+        unknown = [str(k) for k in table if k not in FORMATS]
         if unknown:
             problems.append(
-                f"{owner}: {key} has unknown language(s) {', '.join(unknown)} "
-                + f"(expected {', '.join(LANGUAGES)})"
+                f"{owner}: {key} has unknown format(s) {', '.join(unknown)} "
+                + f"(expected {', '.join(FORMATS)})"
             )
         texts: dict[str, str] = {}
-        for language in LANGUAGES:
-            text = table.get(language, "")
+        for fmt in FORMATS:
+            text = table.get(fmt, "")
             if not isinstance(text, str):
-                problems.append(f"{owner}: {key}.{language} must be a string")
+                problems.append(f"{owner}: {key}.{fmt} must be a string")
                 text = ""
-            texts[language] = text
+            texts[fmt] = text
         return Rendered(latex=texts["latex"], typst=texts["typst"])
     problems.append(f"{owner}: {key} must be a string or a table with keys latex and typst")
     return Rendered()
+
+
+def _translated(
+    owner: str, key: str, value: object, default: Language, problems: list[str]
+) -> Translated:
+    if isinstance(value, str):
+        return Translated({default: value})
+    if not isinstance(value, Mapping):
+        problems.append(f"{owner}: {key} must be a string or a table with one entry per language")
+        return Translated()
+    table = cast(Mapping[object, object], value)
+    if table and all(code in FORMATS for code in table):  # the default language, per format
+        return Translated({default: _rendered(owner, key, table, problems)})
+    if any(code in FORMATS for code in table):
+        problems.append(
+            f"{owner}: {key} mixes languages and formats: write {key}.<language> = "
+            + "{ latex = ..., typst = ... }"
+        )
+        return Translated()
+    return Translated(
+        {
+            str(code): _rendered(owner, f"{key}.{code}", text, problems)
+            for code, text in table.items()
+        }
+    )
+
+
+def _languages(value: object, problems: list[str]) -> tuple[Language, ...]:
+    if isinstance(value, list) and all(isinstance(item, str) for item in cast(list[object], value)):
+        return tuple(cast(list[str], value))
+    problems.append('languages: must be a list of language codes, like ["en", "fr"]')
+    return _DEFAULT_LANGUAGES
 
 
 def _table(
@@ -79,7 +123,7 @@ def _table(
     return table
 
 
-def _group(key: str, value: object, problems: list[str]) -> Group | None:
+def _group(key: str, value: object, default: Language, problems: list[str]) -> Group | None:
     owner = f"group {key!r}"
     table = _table(owner, value, _GROUP_KEYS, problems)
     if table is None:
@@ -88,7 +132,7 @@ def _group(key: str, value: object, problems: list[str]) -> Group | None:
         problems.append(f"{owner}: title is missing")
         return None
     local: list[str] = []
-    title = _rendered(owner, "title", table["title"], local)
+    title = _translated(owner, "title", table["title"], default, local)
     if local:
         problems.extend(local)
         return None
@@ -99,7 +143,7 @@ def _group(key: str, value: object, problems: list[str]) -> Group | None:
         return None
 
 
-def _notation(name: str, value: object, problems: list[str]) -> Notation | None:
+def _notation(name: str, value: object, default: Language, problems: list[str]) -> Notation | None:
     owner = f"notation {name!r}"
     table = _table(owner, value, _NOTATION_KEYS, problems)
     if table is None:
@@ -115,7 +159,7 @@ def _notation(name: str, value: object, problems: list[str]) -> Notation | None:
     if not isinstance(arguments, int):
         local.append(f"{owner}: arguments must be an integer")
     symbol = _rendered(owner, "symbol", table.get("symbol", ""), local)
-    description = _rendered(owner, "description", table.get("description", ""), local)
+    description = _translated(owner, "description", table.get("description", ""), default, local)
     units = _rendered(owner, "units", table.get("units", ""), local)
     if local or not (
         isinstance(group, str) and isinstance(sort, str) and isinstance(arguments, int)
@@ -152,12 +196,14 @@ def from_dict(data: Mapping[str, object]) -> NotationSet:
         raise NotationError(
             f"file: format version {version!r} is not supported (expected {FORMAT_VERSION})"
         )
+    languages = _languages(top.get("languages", list(_DEFAULT_LANGUAGES)), problems)
+    default = languages[0] if languages else _DEFAULT_LANGUAGES[0]
     groups = [
-        _group(key, value, problems)
+        _group(key, value, default, problems)
         for key, value in (_table("groups", top.get("groups", {}), None, problems) or {}).items()
     ]
     notations = [
-        _notation(name, value, problems)
+        _notation(name, value, default, problems)
         for name, value in (
             _table("notations", top.get("notations", {}), None, problems) or {}
         ).items()
@@ -166,6 +212,7 @@ def from_dict(data: Mapping[str, object]) -> NotationSet:
         result = NotationSet(
             (notation for notation in notations if notation is not None),
             (group for group in groups if group is not None),
+            languages,
         )
     except NotationError as error:
         problems.extend(error.problems)
@@ -178,16 +225,27 @@ def from_dict(data: Mapping[str, object]) -> NotationSet:
 def _rendered_value(value: Rendered) -> str | dict[str, str]:
     if value.is_uniform:
         return value.latex
-    return {language: value.get(language) for language in LANGUAGES}
+    return {fmt: value.get(fmt) for fmt in FORMATS}
+
+
+def _translated_value(value: Translated, languages: tuple[Language, ...]) -> object:
+    if len(languages) == 1 and value.languages == languages:
+        return _rendered_value(value[languages[0]])
+    return {language: _rendered_value(text) for language, text in value.items()}
 
 
 def to_dict(notations: NotationSet) -> dict[str, object]:
     """Return the dict of the notation file of ``notations`` (the inverse of :func:`from_dict`).
 
-    Rendered fields that are the same in every language are single strings; default values
-    (no group, no units, no arguments, no sort key) are left out.
+    Texts that are the same in every format are single strings, and so are descriptions and
+    titles when the set has one language; default values (no group, no units, no arguments,
+    no sort key) are left out.
     """
-    groups = {group.key: {"title": _rendered_value(group.title)} for group in notations.groups}
+    languages = notations.languages
+    groups = {
+        group.key: {"title": _translated_value(group.title, languages)}
+        for group in notations.groups
+    }
     entries: dict[str, object] = {}
     for notation in notations:
         entry: dict[str, object] = {}
@@ -198,11 +256,16 @@ def to_dict(notations: NotationSet) -> dict[str, object]:
         if notation.sort:
             entry["sort"] = notation.sort
         entry["symbol"] = _rendered_value(notation.symbol)
-        entry["description"] = _rendered_value(notation.description)
+        entry["description"] = _translated_value(notation.description, languages)
         if not notation.units.is_empty:
             entry["units"] = _rendered_value(notation.units)
         entries[notation.name] = entry
-    return {"version": FORMAT_VERSION, "groups": groups, "notations": entries}
+    return {
+        "version": FORMAT_VERSION,
+        "languages": list(languages),
+        "groups": groups,
+        "notations": entries,
+    }
 
 
 def loads(text: str) -> NotationSet:
@@ -274,6 +337,8 @@ def _toml_value(value: object) -> str:
         return "true" if value else "false"
     if isinstance(value, int):
         return str(value)
+    if isinstance(value, list):
+        return "[" + ", ".join(_toml_value(item) for item in cast(list[object], value)) + "]"
     if isinstance(value, Mapping):
         table = cast(Mapping[str, object], value)
         items = ", ".join(f"{key} = {_toml_value(item)}" for key, item in table.items())
@@ -288,7 +353,7 @@ def dumps(notations: NotationSet) -> str:
     the file stays readable and editable by hand.
     """
     data = to_dict(notations)
-    lines = [f"version = {FORMAT_VERSION}"]
+    lines = [f"version = {FORMAT_VERSION}", f"languages = {_toml_value(data['languages'])}"]
     for section in ("groups", "notations"):
         for key, table in cast(dict[str, dict[str, object]], data[section]).items():
             lines.append("")

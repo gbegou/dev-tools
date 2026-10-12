@@ -4,8 +4,9 @@ import tkinter as tk
 from tkinter import ttk
 from typing import final
 
-from notation_manager.gui.form import GroupForm
+from notation_manager.gui.form import GroupForm, title_key
 from notation_manager.model import NotationError, NotationSet
+from notation_manager.typing import FORMATS
 
 __all__ = ["GroupsDialog"]
 
@@ -18,6 +19,11 @@ class GroupsDialog:
 
     Attributes
     ----------
+    fields
+        The variables of the editor fields, by field name of
+        :meth:`~notation_manager.gui.form.GroupForm.values`.
+    problems
+        The variable of the problems shown in the editor.
     changed
         Whether the groups were changed.
     current
@@ -33,7 +39,9 @@ class GroupsDialog:
         self.window = tk.Toplevel(parent)
         self.window.title("Groups")
         self.window.transient(parent.winfo_toplevel())
-        self.fields = {name: tk.StringVar(self.window) for name in GroupForm().values()}
+        self.fields = {
+            name: tk.StringVar(self.window) for name in GroupForm().values(notations.languages)
+        }
         self.problems = tk.StringVar(self.window)
 
         frame = ttk.Frame(self.window, padding=8)
@@ -51,20 +59,30 @@ class GroupsDialog:
 
         editor = ttk.Frame(frame)
         editor.grid(row=0, column=2, sticky="new")
-        _ = editor.columnconfigure(1, weight=1)
-        for row, (text, name) in enumerate(
-            [("Key", "key"), ("Title (LaTeX)", "title_latex"), ("Title (Typst)", "title_typst")]
-        ):
-            ttk.Label(editor, text=text).grid(row=row, column=0, sticky="w", pady=2)
-            ttk.Entry(editor, textvariable=self.fields[name], width=32).grid(
-                row=row, column=1, sticky="ew", pady=2, padx=4
+        _ = editor.columnconfigure((1, 2), weight=1)
+        ttk.Label(editor, text="Key").grid(row=0, column=0, sticky="w", pady=2)
+        ttk.Entry(editor, textvariable=self.fields["key"], width=24).grid(
+            row=0, column=1, columnspan=2, sticky="ew", pady=2, padx=4
+        )
+        ttk.Label(editor, text="LaTeX").grid(row=1, column=1, sticky="w", padx=4)
+        ttk.Label(editor, text="Typst (empty: as LaTeX)").grid(row=1, column=2, sticky="w", padx=4)
+        for row, language in enumerate(notations.languages, start=2):
+            default = " — default" if language == notations.default_language else ""
+            ttk.Label(editor, text=f"Title ({language}{default})").grid(
+                row=row, column=0, sticky="w", pady=2
             )
+            for column, fmt in enumerate(FORMATS, start=1):
+                var = self.fields[title_key(language, fmt)]
+                ttk.Entry(editor, textvariable=var, width=24).grid(
+                    row=row, column=column, sticky="ew", pady=2, padx=4
+                )
+        last = len(notations.languages) + 2
         buttons = ttk.Frame(editor)
-        buttons.grid(row=3, column=0, columnspan=2, sticky="w", pady=(8, 0))
+        buttons.grid(row=last, column=0, columnspan=3, sticky="w", pady=(8, 0))
         for text, command in [("Apply", self.apply), ("New", self.new), ("Delete", self.delete)]:
             ttk.Button(buttons, text=text, command=command).pack(side="left", padx=(0, 4))
         ttk.Label(editor, textvariable=self.problems, foreground=_ERROR_COLOR, wraplength=320).grid(
-            row=4, column=0, columnspan=2, sticky="w", pady=(6, 0)
+            row=last + 1, column=0, columnspan=3, sticky="w", pady=(6, 0)
         )
         ttk.Button(frame, text="Close", command=self.window.destroy).grid(
             row=1, column=2, sticky="se"
@@ -85,11 +103,11 @@ class GroupsDialog:
 
     def read_form(self) -> GroupForm:
         """Return the content of the editor."""
-        return GroupForm(**{name: var.get() for name, var in self.fields.items()})
+        return GroupForm.from_values({name: var.get() for name, var in self.fields.items()})
 
     def write_form(self, form: GroupForm) -> None:
         """Show ``form`` in the editor."""
-        for name, value in form.values().items():
+        for name, value in form.values(self.notations.languages).items():
             self.fields[name].set(value)
         self.problems.set("")
 
