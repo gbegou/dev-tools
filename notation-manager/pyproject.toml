@@ -1,0 +1,73 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "notation-manager"
+dynamic = ["version"]
+description = "Notations defined once, rendered in LaTeX (nomencl) and Typst, with a graphical editor."
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [{ name = "Guillaume Begou" }]
+keywords = ["latex", "typst", "nomenclature", "notation", "nomencl"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Text Processing :: Markup :: LaTeX",
+]
+dependencies = []
+
+[project.optional-dependencies]
+preview = ["typst>=0.13"]
+
+[project.scripts]
+notation-manager = "notation_manager.cli:main"
+
+[dependency-groups]
+test = ["pytest>=8"]
+lint = ["ruff>=0.6", "basedpyright>=1.18", "typst>=0.13", "pytest>=8", "sphinx>=7.2"]
+doc = ["sphinx>=7.2", "furo>=2024.1.29"]
+dev = [
+    { include-group = "test" },
+    { include-group = "lint" },
+    { include-group = "doc" },
+]
+
+[tool.setuptools.dynamic]
+version = { attr = "notation_manager.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+notation_manager = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["test"]
+python_files = ["test_*.py", "snippet_*.py"]
+python_functions = ["test_*", "snippet_*"]
+addopts = ["--import-mode=importlib"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP", "C4", "SIM", "RUF", "PL", "PT", "N", "D", "PTH", "TID"]
+ignore = [
+    "D105",    # magic methods: their meaning is the protocol's
+    "D107",    # __init__: parameters are documented on the class
+    "PLR0913", # keyword-only options
+    "PLR2004", # magic values in tests and arguments counts
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.per-file-ignores]
+"test/*" = ["D", "PLC0415"]
+"doc/conf.py" = ["D", "INP001"]
+
+[tool.basedpyright]
+include = ["src", "test", "doc/conf.py"]
+pythonVersion = "3.12"

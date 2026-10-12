@@ -1,0 +1,83 @@
+Developer guide
+===============
+
+Layout
+------
+
+.. code-block:: text
+
+   src/notation_manager/
+       model.py          Rendered, Notation, Group, NotationSet: validation and editing
+       io.py             notation files (TOML): read, write, to and from dicts
+       export/latex.py   LaTeX export (commands, nomencl entries)
+       export/typst.py   Typst export (variables and functions, nomenclature)
+       preview.py        Typst rendering of a notation (optional typst package)
+       cli.py            command line
+       gui/              Tkinter interface: app (main window), groups (group editor),
+                         form (the logic without a display), prompts (dialogs)
+       typing.py         types for clients (Language)
+       logging.py        get_logger
+   test/                 test_*.py, and snippet_*.py included in the documentation
+   examples/             the example notation file and documents (tested and documented)
+   doc/                  this documentation (Sphinx)
+
+Conventions
+-----------
+
+- Python 3.12 or later, no runtime dependency; ``typst`` is the optional ``preview`` extra.
+  Type aliases are ``type X = ...`` statements.
+- ruff (lint and format) and basedpyright (its default, strict, configuration): 0 errors,
+  0 warnings. A suppression names its rule and says why (typeshed leaves some Tk options
+  untyped).
+- NumPy-style docstrings, rendered by the API page.
+- A notation, group or file problem is a :class:`~notation_manager.model.NotationError`
+  whose ``problems`` list every problem, each naming the notation (or group) and the field.
+  Functions that read user input report every problem at once, never the first only.
+- The model knows nothing of the interface; the interface logic that needs no display
+  (forms, search) is in ``gui/form.py``, tested without Tk.
+- The names the exports define are reserved (:data:`~notation_manager.model.RESERVED_NAMES`):
+  a new LaTeX helper is a reserved letters-only name, a new Typst helper a hyphenated name
+  (which no notation can take).
+
+Setting up
+----------
+
+.. code-block:: console
+
+   $ python3.12 -m venv .venv && . .venv/bin/activate
+   $ pip install -e . --group dev        # pip 25.1 or later; or: uv sync --group dev
+
+Checks
+------
+
+Before every push:
+
+.. code-block:: console
+
+   $ ruff format --check . && ruff check .
+   $ basedpyright
+   $ xvfb-run -a pytest            # the GUI tests need a display; they are skipped without
+   $ sphinx-build -W --keep-going -E -b html doc doc/_build/html
+
+The tests that need a tool are skipped when it is missing: the GUI tests (Tkinter and a
+display), the LaTeX document (``pdflatex``, ``makeindex``, ``nomencl``, ``siunitx``), the
+Typst documents and preview (``typst`` package), the documentation build (Sphinx and furo).
+Run them all before a push: the skip reasons are listed by ``pytest -rs``.
+
+The example documents are compiled by the tests: ``examples/document.tex`` with the LaTeX
+export of ``examples/notations.toml``, and ``examples/document.typ`` with its Typst export.
+
+Checklist for a new feature
+---------------------------
+
+- Tests next to the code it exercises (``test/test_<module>.py``), including the problems
+  reported for invalid input.
+- ``__all__`` of the module, and ``notation_manager/__init__.py`` or ``typing.py`` when
+  clients need it.
+- Docstrings, and the module on the :doc:`api` page.
+- The :doc:`user_manual`: what it does, its limits, a tested example (``examples/`` or
+  ``test/snippet_<topic>.py`` with ``literalinclude`` markers).
+- The :doc:`release_notes` and the :doc:`roadmap`.
+- When the export changes: compile the example documents (the tests do it), and check the
+  output by eye.
+- The checks above: ruff, basedpyright, every test with every tool, the documentation.

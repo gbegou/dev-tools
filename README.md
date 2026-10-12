@@ -10,6 +10,7 @@ Rules and tools I give to Claude, reusable across projects.
 | `tools/check_ci.py` | Checks GitLab CI files: script lines are strings, `needs`/`extends` resolve |
 | `templates/gitlab-ci/` | GitLab CI layout for a cluster with modules and Jacamar runners (from pomac: replace the project name, ctest patterns and modules) |
 | `doc/official_and_github.md` | The workflow between an official repository and its GitHub copy, with the two tools, step by step |
+| `notation-manager/` | A project incubated here until it has its own repository: notations defined once (TOML), exported to LaTeX (nomencl) and Typst, with a Tkinter editor |
 
 ## Use in a project
 

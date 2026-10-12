@@ -1,0 +1,47 @@
+# Example notations: a few fluid mechanics quantities.
+version = 1
+
+[groups.latin]
+title = "Latin symbols"
+
+[groups.greek]
+title = { latex = 'Greek symbols', typst = 'Greek symbols' }
+
+[groups.operators]
+title = "Operators"
+
+[notations.velocity]
+group = "latin"
+symbol = { latex = '\mathbf{u}', typst = 'bold(upright(u))' }
+description = "Velocity"
+units = { latex = '\si{\metre\per\second}', typst = 'm/s' }
+
+[notations.pressure]
+group = "latin"
+symbol = 'p'
+description = "Static pressure"
+units = { latex = '\si{\pascal}', typst = 'Pa' }
+
+[notations.density]
+group = "greek"
+sort = "rho"
+symbol = { latex = '\rho', typst = 'rho' }
+description = "Density"
+units = { latex = '\si{\kilogram\per\cubic\metre}', typst = 'kg/m#super[3]' }
+
+[notations.viscosity]
+group = "greek"
+sort = "mu"
+symbol = { latex = '\mu', typst = 'mu' }
+description = { latex = 'Dynamic viscosity', typst = 'Dynamic viscosity' }
+units = { latex = '\si{\pascal\second}', typst = 'Pa s' }
+
+[notations.norm]
+group = "operators"
+arguments = 1
+symbol = { latex = '\left\lVert #1 \right\rVert', typst = 'lr(|| #1 ||)' }
+description = { latex = 'Euclidean norm', typst = 'Euclidean norm' }
+
+[notations.reynolds]
+symbol = { latex = '\mathit{Re}', typst = 'italic("Re")' }
+description = { latex = 'Reynolds number, $\rho U L / \mu$', typst = 'Reynolds number, $rho U L \/ mu$' }
