@@ -21,8 +21,13 @@
 # Never touched at the destination: .git, the submodule checkouts (their paths are read
 # from both repositories, wherever they are), and every file the destination's git does not
 # track (build directories, virtual environments, caches, local files).
-#   - to-github:   .gitmodules is copied, and the submodules are registered at the commits of
-#                  the official repo (gitlinks), so that the GitHub repo builds the same thing.
+#   - to-github:   the GitHub .gitmodules is kept (its URLs are those the GitHub side can
+#                  reach). A submodule with the same URL on both sides is registered at the
+#                  official commit (gitlink), so that the GitHub repo builds the same thing.
+#                  A submodule with another URL (a project of yours with its own GitHub copy,
+#                  e.g. pomac: official commits do not exist there, the histories differ) is
+#                  left alone, and a git-pin-submodule command is printed to pin it once that
+#                  project is synced; so is a submodule missing from the GitHub .gitmodules.
 #                  GitHub-only files (.github/) are kept.
 #   - to-official: the official .gitmodules is kept; the submodules of <ref> (URL, commit) are
 #                  compared with the official ones, and a git-pin-submodule command (in this
@@ -64,7 +69,7 @@ case $direction in
   to-github)
     src=$official; dst=$github
     ref=${ref:-HEAD}
-    excludes=(/.git /.github /.claude)
+    excludes=(/.git /.gitmodules /.github /.claude)
     ;;
   to-official)
     src=$github; dst=$official
@@ -172,14 +177,33 @@ while read -r _ type subsha path; do
   [[ $type == commit ]] || continue
   current=$(git -C "$dst" ls-files -s -- "$path" | awk '$1 == "160000" {print $2}')
   if [[ $direction == to-github ]]; then
-    if [[ $subsha == "$current" ]]; then
+    official_url=$(field_of "$export_dir/.gitmodules" "$path" url)
+    github_url=$(field_of "$dst/.gitmodules" "$path" url)
+    if [[ -z $github_url ]]; then
+      echo "  $path: not in the GitHub .gitmodules (official $official_url @ ${subsha:0:7}); to add it:"
+      echo "      (cd $dst && git-pin-submodule $path -u $official_url -b $(branch_of "$path" "$official_url" "$subsha") -c $subsha)"
+    elif [[ $github_url != "$official_url" ]]; then
+      # another repository (e.g. the GitHub copy of a project of yours): the official commit is
+      # not there. Kept as it is; once that project is synced, pin the tip of its GitHub branch
+      echo "  $path: official $official_url @ ${subsha:0:7}, GitHub $github_url @ ${current:0:7}:"
+      echo "      kept (another repository). Once it is synced, pin its GitHub branch's tip:"
+      echo "      (cd $dst && git-pin-submodule $path)"
+    elif [[ $subsha == "$current" ]]; then
       echo "  $path: same commit ${subsha:0:7}"
     else
-      echo "  $path: register ${subsha:0:7} (was ${current:0:7})"
+      echo "  $path: register ${subsha:0:7} (was ${current:-none})" | sed 's/\([0-9a-f]\{7\}\)[0-9a-f]\{33\}/\1/'
       if $apply; then
         # an empty directory is an unpopulated submodule (otherwise `git add -A` records a deletion)
         mkdir -p "$dst/$path"
         git -C "$dst" update-index --add --cacheinfo "160000,$subsha,$path"
+      fi
+    fi
+    if [[ -n $github_url && $github_url == "$official_url" ]]; then
+      official_branch=$(field_of "$export_dir/.gitmodules" "$path" branch)
+      github_branch=$(field_of "$dst/.gitmodules" "$path" branch)
+      if [[ $official_branch != "$github_branch" ]]; then
+        echo "  $path: official branch ${official_branch:-<none>}, GitHub ${github_branch:-<none>}; to align:"
+        echo "      (cd $dst && git-pin-submodule $path -b ${official_branch:-<branch>} -c $subsha)"
       fi
     fi
     continue
@@ -202,6 +226,12 @@ while read -r _ type subsha path; do
 
   echo "      (cd $dst && git-pin-submodule $path -u $url -b $(branch_of "$path" "$src_url" "$subsha") -c $subsha)"
 done < <(git -C "$src" ls-tree -r "$sha")
+while read -r path; do
+  [[ -n $path ]] || continue
+  git -C "$src" ls-tree "$sha" -- "$path" | grep -q ' commit ' && continue
+  echo "  $path: only at the destination (removed at the source?): kept; remove it with"
+  echo "      (cd $dst && git rm $path && git config -f .gitmodules --remove-section submodule.$path)"
+done < <(git -C "$dst" ls-files -s | awk '$1 == "160000" {print $4}')
 
 # ---- traces
 echo

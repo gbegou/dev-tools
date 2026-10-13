@@ -71,9 +71,21 @@ sync_project.sh <name> to-github            # dry run, HEAD of the official repo
 sync_project.sh --apply <name> to-github
 ```
 
-`.gitmodules` is copied as is, and the submodules are registered at the official commits
-(gitlinks), so that the GitHub copy builds the same thing. GitHub-only files are kept.
-Commit in the GitHub copy; then `git submodule update --init` to populate the checkouts.
+The GitHub `.gitmodules` is kept: its URLs are those the GitHub side can reach. For each
+submodule of the official repository, the dry run says what happens:
+
+- same URL on both sides (a third-party dependency, e.g. `external/eigen`): the GitHub copy
+  is registered at the official commit (gitlink), so that it builds the same thing; a
+  different tracked branch is reported, with the command to align it;
+- another URL (a project of yours with its own GitHub copy, e.g. `external/pomac` on the
+  ONERA GitLab and on GitHub): the official commit does not exist on GitHub (the histories
+  differ), so the submodule is left as it is. Sync that project first, then pin the tip of its
+  GitHub branch with the printed command (`git-pin-submodule external/pomac`);
+- missing from the GitHub `.gitmodules`: a `git-pin-submodule` command to add it is printed;
+- a submodule only the GitHub copy has is reported, with the commands to remove it.
+
+GitHub-only files are kept. Commit in the GitHub copy; then `git submodule update --init` to
+populate the checkouts.
 
 ## Submodules: `git pin-submodule`
 
