@@ -1,4 +1,6 @@
-"""Notations defined once, rendered in LaTeX and Typst.
+"""ANATOLE is a Notations And acronyms manager with Typst Or LaTeX Exporters.
+
+Notations defined once, rendered in LaTeX and Typst.
 
 A notation file (TOML) holds notations: a command name, a symbol and units written once per
 format (LaTeX, Typst), and a description written once per language (English, French...). The
@@ -7,9 +9,9 @@ nomenclature) and a Typst file (variables and a nomenclature), in a chosen langu
 a graphical interface to browse and edit them.
 """
 
-from notation_manager.export import export, to_latex, to_typst
-from notation_manager.io import dumps, from_dict, load, loads, save, to_dict
-from notation_manager.model import (
+from anatole.export import export, to_latex, to_typst
+from anatole.io import dumps, from_dict, load, loads, save, to_dict
+from anatole.model import (
     Group,
     Notation,
     NotationError,

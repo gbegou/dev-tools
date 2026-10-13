@@ -1,4 +1,6 @@
-# notation-manager
+# ANATOLE
+
+**A**NATOLE is a **N**otations **A**nd acronyms manager with **T**ypst **O**r **L**aTeX **E**xporters.
 
 Define each notation once, use it in **LaTeX** and **Typst**, in **English**, **French** or
 any other language.
@@ -19,7 +21,7 @@ description = { en = "Velocity", fr = "Vitesse" }
 units = { latex = '\si{\metre\per\second}', typst = 'm/s' }
 ```
 
-`notation-manager` exports it, in the language of the document (the default one, or
+`anatole` exports it, in the language of the document (the default one, or
 `--language fr`; a missing translation falls back on the default language):
 
 - to **LaTeX**: `\newcommand{\velocity}{\ensuremath{\mathbf{u}}}`, and
@@ -32,10 +34,10 @@ notations and groups, with a Typst preview.
 
 ```console
 $ pip install -e '.[preview]'
-$ notation-manager gui examples/notations.toml
-$ notation-manager check examples/notations.toml
-$ notation-manager export examples/notations.toml notations.tex
-$ notation-manager export --language fr examples/notations.toml notations.typ
+$ anatole gui examples/notations.toml
+$ anatole check examples/notations.toml
+$ anatole export examples/notations.toml notations.tex
+$ anatole export --language fr examples/notations.toml notations.typ
 ```
 
 Python 3.12 or later, no runtime dependency (`typst` for the preview). The documentation

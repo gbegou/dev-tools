@@ -6,9 +6,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from notation_manager import __version__  # noqa: E402
+from anatole import __version__  # noqa: E402
 
-project = "notation-manager"
+project = "ANATOLE"
 author = "Guillaume Begou"
 copyright = "2026, Guillaume Begou"
 release = __version__
@@ -27,5 +27,5 @@ nitpick_ignore_regex = [
 ]
 
 html_theme = "furo"
-html_title = f"notation-manager {release}"
+html_title = f"ANATOLE {release}"
 exclude_patterns = ["_build"]

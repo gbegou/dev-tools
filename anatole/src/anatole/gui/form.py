@@ -8,8 +8,8 @@ that a text common to both formats is typed once.
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 
-from notation_manager.model import Group, Notation, NotationError, Rendered, Translated
-from notation_manager.typing import FORMATS, Language
+from anatole.model import Group, Notation, NotationError, Rendered, Translated
+from anatole.typing import FORMATS, Language
 
 __all__ = ["GroupForm", "NotationForm", "Pair", "description_key", "matches", "title_key"]
 

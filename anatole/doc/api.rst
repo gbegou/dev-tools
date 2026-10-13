@@ -5,57 +5,57 @@ The package exports the model, the file functions and the exports:
 
 .. code-block:: python
 
-   from notation_manager import Group, Notation, NotationSet, Rendered, load, save, export
+   from anatole import Group, Notation, NotationSet, Rendered, load, save, export
 
 Model
 -----
 
-.. automodule:: notation_manager.model
+.. automodule:: anatole.model
 
 Types
 -----
 
-.. automodule:: notation_manager.typing
+.. automodule:: anatole.typing
 
 Notation files
 --------------
 
-.. automodule:: notation_manager.io
+.. automodule:: anatole.io
 
 Exports
 -------
 
-.. automodule:: notation_manager.export
+.. automodule:: anatole.export
    :members: SUFFIXES, export, language_of, to_text
 
-.. automodule:: notation_manager.export.latex
+.. automodule:: anatole.export.latex
 
-.. automodule:: notation_manager.export.typst
+.. automodule:: anatole.export.typst
 
 Preview
 -------
 
-.. automodule:: notation_manager.preview
+.. automodule:: anatole.preview
 
 Command line
 ------------
 
-.. automodule:: notation_manager.cli
+.. automodule:: anatole.cli
 
 Graphical interface
 -------------------
 
-.. automodule:: notation_manager.gui
+.. automodule:: anatole.gui
 
-.. automodule:: notation_manager.gui.form
+.. automodule:: anatole.gui.form
 
-.. automodule:: notation_manager.gui.app
+.. automodule:: anatole.gui.app
 
-.. automodule:: notation_manager.gui.groups
+.. automodule:: anatole.gui.groups
 
-.. automodule:: notation_manager.gui.prompts
+.. automodule:: anatole.gui.prompts
 
 Logging
 -------
 
-.. automodule:: notation_manager.logging
+.. automodule:: anatole.logging

@@ -1,4 +1,4 @@
-"""Command line: ``notation-manager {gui,check,list,export}``."""
+"""Command line: ``anatole {gui,check,list,export}``."""
 
 import argparse
 import logging
@@ -6,11 +6,11 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from notation_manager import __version__
-from notation_manager.export import SUFFIXES, export
-from notation_manager.io import load
-from notation_manager.model import NotationError
-from notation_manager.typing import FORMATS, Format, Language
+from anatole import __version__
+from anatole.export import SUFFIXES, export
+from anatole.io import load
+from anatole.model import NotationError
+from anatole.typing import FORMATS, Format, Language
 
 __all__ = ["main"]
 
@@ -30,8 +30,9 @@ class _Arguments(argparse.Namespace):
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="notation-manager",
-        description="Manage notations once, use them in LaTeX and Typst.",
+        prog="anatole",
+        description="ANATOLE is a Notations And acronyms manager with Typst Or LaTeX "
+        + "Exporters: define notations once, use them in LaTeX and Typst.",
     )
     _ = parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     _ = parser.add_argument(
@@ -137,7 +138,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             case "export" if file is not None and output is not None:
                 return _export(file, output, arguments.format, arguments.language)
             case _:
-                from notation_manager.gui import run  # noqa: PLC0415  # tkinter only when needed
+                from anatole.gui import run  # noqa: PLC0415  # tkinter only when needed
 
                 return run(file)
     except (OSError, ValueError) as error:  # NotationError is a ValueError

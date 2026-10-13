@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from notation_manager import (
+from anatole import (
     Group,
     Notation,
     NotationError,
@@ -15,7 +15,7 @@ from notation_manager import (
     Translated,
     to_latex,
 )
-from notation_manager.export.latex import MAX_GROUPS
+from anatole.export.latex import MAX_GROUPS
 
 
 def test_commands(small: NotationSet) -> None:
@@ -72,7 +72,7 @@ def test_too_many_groups() -> None:
 
 
 def test_language(small: NotationSet, caplog: pytest.LogCaptureFixture) -> None:
-    with caplog.at_level("WARNING", logger="notation_manager"):
+    with caplog.at_level("WARNING", logger="anatole"):
         text = to_latex(small, language="fr")
     assert r"\@namedef{notation@group@C}{Grec}" in text
     assert r"{$\velocity$}{Vitesse\nomunit{\si{m/s}}}%" in text

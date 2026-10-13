@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from notation_manager import NotationSet, __version__, load, save
-from notation_manager.cli import main
+from anatole import NotationSet, __version__, load, save
+from anatole.cli import main
 
 EXAMPLE = Path(__file__).resolve().parent.parent / "examples" / "notations.toml"
 
@@ -14,7 +14,7 @@ def test_version(capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit) as caught:
         _ = main(["--version"])
     assert caught.value.code == 0
-    assert capsys.readouterr().out == f"notation-manager {__version__}\n"
+    assert capsys.readouterr().out == f"anatole {__version__}\n"
 
 
 def test_check(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
@@ -93,7 +93,7 @@ def test_gui_is_the_default(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
         opened.append(path)
         return 0
 
-    monkeypatch.setattr("notation_manager.gui.run", run)
+    monkeypatch.setattr("anatole.gui.run", run)
     assert main([]) == 0
     assert main(["gui", str(tmp_path / "new.toml")]) == 0
     assert opened == [None, tmp_path / "new.toml"]
@@ -102,7 +102,7 @@ def test_gui_is_the_default(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
 def test_verbose_logs(caplog: pytest.LogCaptureFixture, tmp_path: Path) -> None:
     path = tmp_path / "notations.toml"
     save(NotationSet(), path)
-    with caplog.at_level("INFO", logger="notation_manager"):
+    with caplog.at_level("INFO", logger="anatole"):
         assert main(["-v", "export", str(path), str(tmp_path / "out.typ")]) == 0
     assert "exported 0 notations" in caplog.text
     assert load(path) == NotationSet()

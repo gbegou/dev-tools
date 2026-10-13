@@ -10,18 +10,18 @@ interface needs the ``typst`` package:
 
 .. code-block:: console
 
-   $ pip install notation-manager             # or: pip install -e . from a checkout
-   $ pip install 'notation-manager[preview]'  # with the Typst preview
+   $ pip install anatole             # or: pip install -e . from a checkout
+   $ pip install 'anatole[preview]'  # with the Typst preview
 
-This installs the ``notation-manager`` command (also ``python -m notation_manager``).
+This installs the ``anatole`` command (also ``python -m anatole``).
 
 In short
 --------
 
-1. Write the notations in a notation file (by hand, or with ``notation-manager gui``), with
+1. Write the notations in a notation file (by hand, or with ``anatole gui``), with
    their descriptions in one language or several (English, French...).
-2. Export them, in the language of the document: ``notation-manager export notations.toml
-   notations.tex`` and ``notation-manager export --language fr notations.toml notations.typ``.
+2. Export them, in the language of the document: ``anatole export notations.toml
+   notations.tex`` and ``anatole export --language fr notations.toml notations.typ``.
 3. Use them: ``\velocity`` in LaTeX, ``$velocity$`` in Typst, and print the nomenclature.
 
 The notation file
@@ -140,7 +140,7 @@ notation (or group) and the field; nothing is read when there is a problem. The 
    :end-before: # [errors]
    :dedent:
 
-``notation-manager check notations.toml`` runs the same checks, and lists the translations
+``anatole check notations.toml`` runs the same checks, and lists the translations
 missing (an error only with ``--strict``). The checks do not compile
 the symbols: a LaTeX or Typst error in a symbol shows in the preview of the interface (Typst)
 or when the document is compiled.
@@ -153,7 +153,7 @@ a document in French gets ``\notationnomenclature`` and ``notation-nomenclature(
 French. The default language is exported unless another is asked for (``--language fr`` on
 the command line, the *Language* selector of the interface, ``language="fr"`` in Python). A
 translation missing in that language falls back on the default language, with a warning
-for each one; ``notation-manager check`` lists them beforehand.
+for each one; ``anatole check`` lists them beforehand.
 
 The symbols, units and command names do not depend on the language: ``\velocity`` is the
 same command in an English and a French document. A document in two languages (an English
@@ -166,7 +166,7 @@ The words that the nomenclature packages write themselves are theirs to translat
 LaTeX
 -----
 
-Export with ``notation-manager export notations.toml notations.tex`` (or the *File* menu of
+Export with ``anatole export notations.toml notations.tex`` (or the *File* menu of
 the interface). The file defines one command per notation, in text and math mode:
 
 .. code-block:: latex
@@ -199,7 +199,7 @@ Build the nomenclature with ``makeindex``, as ``nomencl`` documents::
 Details
    - ``\newcommand`` fails when LaTeX or a package already defines the name (``\time`` is a
      TeX primitive, for one): rename the notation. From Python,
-     :func:`~notation_manager.export.latex.to_latex` takes ``definition="providecommand"``
+     :func:`~anatole.export.latex.to_latex` takes ``definition="providecommand"``
      (keep the existing command) or ``"renewcommand"`` (replace it).
    - The units go to ``\nomunit``, right-aligned. ``nomencl`` 5.6 does not define it, so the
      file defines it when it is missing, as the ``nomencl`` documentation suggests. The
@@ -214,7 +214,7 @@ Details
 Typst
 -----
 
-Export with ``notation-manager export notations.toml notations.typ``. The file defines one
+Export with ``anatole export notations.toml notations.typ``. The file defines one
 variable per notation, or a function for a notation with arguments:
 
 .. code-block:: text
@@ -264,7 +264,7 @@ Details
 Graphical interface
 -------------------
 
-``notation-manager gui notations.toml`` (or just ``notation-manager``) opens the interface.
+``anatole gui notations.toml`` (or just ``anatole``) opens the interface.
 
 - At the top, the search field filters the notations on every field (name, group, sort key,
   symbols, units, descriptions in every language), all words matching; the *Language*
@@ -299,15 +299,15 @@ as TOML literal strings when they can be.
 Command line
 ------------
 
-``notation-manager gui [FILE]``
+``anatole gui [FILE]``
    Open the interface (the default command).
-``notation-manager check [--strict] FILE...``
+``anatole check [--strict] FILE...``
    Check notation files: report every problem, and list the translations missing. Exit with
    1 if a file is invalid, or, with ``--strict``, if translations are missing.
-``notation-manager list [-f {latex,typst}] [-l LANGUAGE] FILE``
+``anatole list [-f {latex,typst}] [-l LANGUAGE] FILE``
    List the notations: name, group, symbol in a format (LaTeX by default) and description
    in a language (the default one by default).
-``notation-manager export [-f {latex,typst}] [-l LANGUAGE] FILE OUTPUT``
+``anatole export [-f {latex,typst}] [-l LANGUAGE] FILE OUTPUT``
    Export a notation file. The format follows the suffix of ``OUTPUT`` (``.tex`` and
    ``.sty``: LaTeX, ``.typ``: Typst) unless ``--format`` is given; the descriptions are in
    the default language unless ``--language`` is given.
@@ -320,7 +320,7 @@ Python
 ------
 
 The package builds, reads, writes and exports notation sets
-(:class:`~notation_manager.model.NotationSet`):
+(:class:`~anatole.model.NotationSet`):
 
 .. literalinclude:: ../test/snippet_api.py
    :language: python
@@ -334,6 +334,6 @@ The package builds, reads, writes and exports notation sets
    :end-before: # [export]
    :dedent:
 
-:func:`~notation_manager.io.to_dict` and :func:`~notation_manager.io.from_dict` convert to
+:func:`~anatole.io.to_dict` and :func:`~anatole.io.from_dict` convert to
 and from the dict of a notation file, to store notations elsewhere (JSON, a database...).
 See the :doc:`api`.

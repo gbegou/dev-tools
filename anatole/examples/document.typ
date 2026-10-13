@@ -1,5 +1,5 @@
 // [import]
-// Exported by: notation-manager export notations.toml notations.typ
+// Exported by: anatole export notations.toml notations.typ
 #import "notations.typ": *
 // [import]
 // [body]

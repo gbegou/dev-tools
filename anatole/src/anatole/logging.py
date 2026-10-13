@@ -1,4 +1,4 @@
-"""Logging helpers: one logger per module, under the ``notation_manager`` logger."""
+"""Logging helpers: one logger per module, under the ``anatole`` logger."""
 
 import logging
 
@@ -13,6 +13,6 @@ def get_logger(name: str) -> logging.Logger:
     name
         The module's ``__name__``; names outside the package are put under it.
     """
-    if name != "notation_manager" and not name.startswith("notation_manager."):
-        name = f"notation_manager.{name}"
+    if name != "anatole" and not name.startswith("anatole."):
+        name = f"anatole.{name}"
     return logging.getLogger(name)

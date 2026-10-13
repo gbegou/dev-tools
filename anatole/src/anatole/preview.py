@@ -7,9 +7,9 @@ description and units exactly as a document would.
 import importlib.util
 from dataclasses import replace
 
-from notation_manager.export.typst import to_typst
-from notation_manager.model import Notation, NotationSet
-from notation_manager.typing import Language
+from anatole.export.typst import to_typst
+from anatole.model import Notation, NotationSet
+from anatole.typing import Language
 
 __all__ = ["PreviewError", "is_available", "render"]
 
@@ -19,7 +19,7 @@ class PreviewError(RuntimeError):
 
 
 def is_available() -> bool:
-    """Whether the ``typst`` package is installed (``pip install notation-manager[preview]``)."""
+    """Whether the ``typst`` package is installed (``pip install anatole[preview]``)."""
     return importlib.util.find_spec("typst") is not None
 
 

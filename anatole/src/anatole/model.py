@@ -12,7 +12,7 @@ from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass, field, replace
 from typing import ClassVar, override
 
-from notation_manager.typing import FORMATS, Format, Language
+from anatole.typing import FORMATS, Format, Language
 
 __all__ = [
     "GROUP_KEY_PATTERN",

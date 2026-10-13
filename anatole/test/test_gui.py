@@ -6,17 +6,17 @@ from typing import cast, final, override
 
 import pytest
 
-from notation_manager import NotationSet, Translated, load, preview
+from anatole import NotationSet, Translated, load, preview
 
 try:
     import tkinter as tk
 except ModuleNotFoundError:  # Python built without Tk
     pytest.skip("needs tkinter", allow_module_level=True)
 
-from notation_manager.gui.app import NotationApp
-from notation_manager.gui.form import GroupForm, NotationForm
-from notation_manager.gui.groups import GroupsDialog
-from notation_manager.gui.prompts import FileTypes, Prompts
+from anatole.gui.app import NotationApp
+from anatole.gui.form import GroupForm, NotationForm
+from anatole.gui.groups import GroupsDialog
+from anatole.gui.prompts import FileTypes, Prompts
 
 
 @final
@@ -106,7 +106,7 @@ def test_starts_without_asking(root: tk.Tk, small: NotationSet) -> None:
     window.prompts = ScriptedPrompts(root)
     assert not window.form_modified
     assert window.current is None
-    assert root.title() == "untitled — Notation manager"
+    assert root.title() == "untitled — Anatole"
     assert tree_names(window) == ["time", "norm", "velocity", "density"]
 
 

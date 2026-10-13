@@ -1,7 +1,7 @@
-"""``python -m notation_manager``: the command line."""
+"""``python -m anatole``: the command line."""
 
 import sys
 
-from notation_manager.cli import main
+from anatole.cli import main
 
 sys.exit(main())

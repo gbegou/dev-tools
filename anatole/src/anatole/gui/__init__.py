@@ -12,8 +12,8 @@ def run(path: Path | None = None) -> int:
     """
     import tkinter as tk  # noqa: PLC0415  # tkinter is optional on some systems
 
-    from notation_manager.gui.app import NotationApp  # noqa: PLC0415
-    from notation_manager.io import load  # noqa: PLC0415
+    from anatole.gui.app import NotationApp  # noqa: PLC0415
+    from anatole.io import load  # noqa: PLC0415
 
     notations = load(path) if path is not None and path.exists() else None
     root = tk.Tk()

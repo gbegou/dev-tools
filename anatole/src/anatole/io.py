@@ -26,8 +26,8 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import cast
 
-from notation_manager.logging import get_logger
-from notation_manager.model import (
+from anatole.logging import get_logger
+from anatole.model import (
     Group,
     Notation,
     NotationError,
@@ -35,7 +35,7 @@ from notation_manager.model import (
     Rendered,
     Translated,
 )
-from notation_manager.typing import FORMATS, Language
+from anatole.typing import FORMATS, Language
 
 __all__ = ["FORMAT_VERSION", "dumps", "from_dict", "load", "loads", "save", "to_dict"]
 

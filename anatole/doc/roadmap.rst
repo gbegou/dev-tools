@@ -10,7 +10,7 @@ Ideas not done yet, roughly by priority.
   (``text.lang`` in Typst, ``\languagename`` with babel in LaTeX), for documents that
   switch languages.
 - Export options on the command line: the LaTeX definition command (``\providecommand``,
-  ``\DeclareRobustCommand``), as :func:`~notation_manager.export.latex.to_latex` already
+  ``\DeclareRobustCommand``), as :func:`~anatole.export.latex.to_latex` already
   takes.
 - Importing the commands of an existing LaTeX file (``\newcommand`` lines) into a notation file.
 - A LaTeX nomenclature for ``glossaries`` (symbols list) as well as ``nomencl``.

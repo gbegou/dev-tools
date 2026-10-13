@@ -1,4 +1,4 @@
-"""Types that clients of notation_manager need."""
+"""Types that clients of anatole need."""
 
 from typing import Literal
 

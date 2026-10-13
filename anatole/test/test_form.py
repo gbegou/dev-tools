@@ -2,8 +2,8 @@
 
 import pytest
 
-from notation_manager import Group, NotationError, NotationSet, Rendered, Translated
-from notation_manager.gui.form import GroupForm, NotationForm, description_key, matches
+from anatole import Group, NotationError, NotationSet, Rendered, Translated
+from anatole.gui.form import GroupForm, NotationForm, description_key, matches
 
 
 def test_notation_form_round_trip(small: NotationSet) -> None:

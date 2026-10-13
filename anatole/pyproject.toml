@@ -3,9 +3,9 @@ requires = ["setuptools>=69"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "notation-manager"
+name = "anatole"
 dynamic = ["version"]
-description = "Notations defined once, rendered in LaTeX (nomencl) and Typst, with a graphical editor."
+description = "ANATOLE is a Notations And acronyms manager with Typst Or LaTeX Exporters."
 readme = "README.md"
 requires-python = ">=3.12"
 authors = [{ name = "Guillaume Begou" }]
@@ -21,7 +21,7 @@ dependencies = []
 preview = ["typst>=0.13"]
 
 [project.scripts]
-notation-manager = "notation_manager.cli:main"
+anatole = "anatole.cli:main"
 
 [dependency-groups]
 test = ["pytest>=8"]
@@ -34,13 +34,13 @@ dev = [
 ]
 
 [tool.setuptools.dynamic]
-version = { attr = "notation_manager.__version__" }
+version = { attr = "anatole.__version__" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-notation_manager = ["py.typed"]
+anatole = ["py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["test"]

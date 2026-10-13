@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from notation_manager import Group, Notation, NotationSet, Rendered, Translated, load
+from anatole import Group, Notation, NotationSet, Rendered, Translated, load
 
 ROOT = Path(__file__).resolve().parent.parent
 EXAMPLE = ROOT / "examples" / "notations.toml"

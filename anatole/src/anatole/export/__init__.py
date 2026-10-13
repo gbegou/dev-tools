@@ -2,11 +2,11 @@
 
 from pathlib import Path
 
-from notation_manager.export.latex import to_latex
-from notation_manager.export.typst import to_typst
-from notation_manager.logging import get_logger
-from notation_manager.model import NotationSet
-from notation_manager.typing import Format, Language
+from anatole.export.latex import to_latex
+from anatole.export.typst import to_typst
+from anatole.logging import get_logger
+from anatole.model import NotationSet
+from anatole.typing import Format, Language
 
 __all__ = ["SUFFIXES", "export", "format_of", "to_latex", "to_text", "to_typst"]
 

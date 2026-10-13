@@ -7,7 +7,7 @@ import pytest
 
 def snippet_api(tmp_path: Path) -> None:
     # [build]
-    from notation_manager import Group, Notation, NotationSet, Rendered, Translated, save
+    from anatole import Group, Notation, NotationSet, Rendered, Translated, save
 
     notations = NotationSet(
         groups=[Group("latin", Translated({"en": "Latin symbols", "fr": "Symboles latins"}))],
@@ -26,7 +26,7 @@ def snippet_api(tmp_path: Path) -> None:
     # [build]
 
     # [export]
-    from notation_manager import export, load, to_typst
+    from anatole import export, load, to_typst
 
     notations = load(tmp_path / "notations.toml")
     export(notations, tmp_path / "notations.tex")  # the format follows the suffix
@@ -43,7 +43,7 @@ def snippet_api(tmp_path: Path) -> None:
 
 def snippet_errors() -> None:
     # [errors]
-    from notation_manager import NotationError, loads
+    from anatole import NotationError, loads
 
     try:
         _ = loads("[notations.u]\nsymbol = '\\mathbf{u'\ndescription = 'Velocity'\n")

@@ -1,8 +1,8 @@
 """What the exports share: the choice of the language."""
 
-from notation_manager.logging import get_logger
-from notation_manager.model import NotationSet
-from notation_manager.typing import Language
+from anatole.logging import get_logger
+from anatole.model import NotationSet
+from anatole.typing import Language
 
 _logger = get_logger(__name__)
 

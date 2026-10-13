@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from notation_manager import (
+from anatole import (
     Notation,
     NotationError,
     NotationSet,

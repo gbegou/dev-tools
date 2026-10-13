@@ -4,9 +4,9 @@ import tkinter as tk
 from tkinter import ttk
 from typing import final
 
-from notation_manager.gui.form import GroupForm, title_key
-from notation_manager.model import NotationError, NotationSet
-from notation_manager.typing import FORMATS
+from anatole.gui.form import GroupForm, title_key
+from anatole.model import NotationError, NotationSet
+from anatole.typing import FORMATS
 
 __all__ = ["GroupsDialog"]
 
@@ -21,7 +21,7 @@ class GroupsDialog:
     ----------
     fields
         The variables of the editor fields, by field name of
-        :meth:`~notation_manager.gui.form.GroupForm.values`.
+        :meth:`~anatole.gui.form.GroupForm.values`.
     problems
         The variable of the problems shown in the editor.
     changed

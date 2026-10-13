@@ -7,14 +7,14 @@ from pathlib import Path
 from tkinter import ttk
 from typing import final
 
-from notation_manager import preview
-from notation_manager.export import export
-from notation_manager.gui.form import NotationForm, description_key, matches
-from notation_manager.gui.groups import GroupsDialog
-from notation_manager.gui.prompts import FileTypes, Prompts
-from notation_manager.io import load, save
-from notation_manager.model import NotationError, NotationSet
-from notation_manager.typing import FORMATS, Format
+from anatole import preview
+from anatole.export import export
+from anatole.gui.form import NotationForm, description_key, matches
+from anatole.gui.groups import GroupsDialog
+from anatole.gui.prompts import FileTypes, Prompts
+from anatole.io import load, save
+from anatole.model import NotationError, NotationSet
+from anatole.typing import FORMATS, Format
 
 __all__ = ["NotationApp"]
 
@@ -52,7 +52,7 @@ class NotationApp:
         Whether the notations have changes that are not saved.
     fields
         The variables of the editor fields, by field name of
-        :meth:`~notation_manager.gui.form.NotationForm.values`.
+        :meth:`~anatole.gui.form.NotationForm.values`.
     language
         The variable of the language shown in the tree and the preview, and exported.
     search
@@ -290,7 +290,7 @@ class NotationApp:
 
     def _update_title(self) -> None:
         name = self.path.name if self.path else "untitled"
-        self.root.title(f"{'*' if self.dirty else ''}{name} — Notation manager")
+        self.root.title(f"{'*' if self.dirty else ''}{name} — Anatole")
 
     def _on_form_write(self, _name: str, _index: str, _mode: str) -> None:
         if self._preview_job is not None:
@@ -522,8 +522,7 @@ class NotationApp:
         if not preview.is_available():
             _ = self.preview_label.configure(
                 image="",
-                text="Install the typst package for a preview: "
-                + "pip install 'notation-manager[preview]'",
+                text="Install the typst package for a preview: " + "pip install 'anatole[preview]'",
             )
             return
         try:

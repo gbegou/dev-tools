@@ -2,7 +2,7 @@
 
 import pytest
 
-from notation_manager import Notation, NotationSet, Rendered, Translated, preview
+from anatole import Notation, NotationSet, Rendered, Translated, preview
 
 pytestmark = pytest.mark.skipif(not preview.is_available(), reason="needs the typst package")
 

@@ -6,7 +6,7 @@ Layout
 
 .. code-block:: text
 
-   src/notation_manager/
+   src/anatole/
        model.py          Rendered, Translated, Notation, Group, NotationSet: validation and
                          editing
        io.py             notation files (TOML): read, write, to and from dicts
@@ -27,22 +27,22 @@ Conventions
 -----------
 
 - Two words are kept apart: a **format** is LaTeX or Typst
-  (:data:`~notation_manager.typing.Format`, ``fmt`` in code, ``--format``), a **language**
-  is a natural language (:data:`~notation_manager.typing.Language`, a code like ``fr``,
-  ``--language``). A text per format is a :class:`~notation_manager.model.Rendered`, a text
-  per language a :class:`~notation_manager.model.Translated` of them.
+  (:data:`~anatole.typing.Format`, ``fmt`` in code, ``--format``), a **language**
+  is a natural language (:data:`~anatole.typing.Language`, a code like ``fr``,
+  ``--language``). A text per format is a :class:`~anatole.model.Rendered`, a text
+  per language a :class:`~anatole.model.Translated` of them.
 - Python 3.12 or later, no runtime dependency; ``typst`` is the optional ``preview`` extra.
   Type aliases are ``type X = ...`` statements.
 - ruff (lint and format) and basedpyright (its default, strict, configuration): 0 errors,
   0 warnings. A suppression names its rule and says why (typeshed leaves some Tk options
   untyped).
 - NumPy-style docstrings, rendered by the API page.
-- A notation, group or file problem is a :class:`~notation_manager.model.NotationError`
+- A notation, group or file problem is a :class:`~anatole.model.NotationError`
   whose ``problems`` list every problem, each naming the notation (or group) and the field.
   Functions that read user input report every problem at once, never the first only.
 - The model knows nothing of the interface; the interface logic that needs no display
   (forms, search) is in ``gui/form.py``, tested without Tk.
-- The names the exports define are reserved (:data:`~notation_manager.model.RESERVED_NAMES`):
+- The names the exports define are reserved (:data:`~anatole.model.RESERVED_NAMES`):
   a new LaTeX helper is a reserved letters-only name, a new Typst helper a hyphenated name
   (which no notation can take).
 
@@ -79,7 +79,7 @@ Checklist for a new feature
 
 - Tests next to the code it exercises (``test/test_<module>.py``), including the problems
   reported for invalid input.
-- ``__all__`` of the module, and ``notation_manager/__init__.py`` or ``typing.py`` when
+- ``__all__`` of the module, and ``anatole/__init__.py`` or ``typing.py`` when
   clients need it.
 - Docstrings, and the module on the :doc:`api` page.
 - The :doc:`user_manual`: what it does, its limits, a tested example (``examples/`` or

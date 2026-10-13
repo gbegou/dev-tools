@@ -4,7 +4,7 @@ from dataclasses import replace
 
 import pytest
 
-from notation_manager import Group, Notation, NotationError, NotationSet, Rendered, Translated
+from anatole import Group, Notation, NotationError, NotationSet, Rendered, Translated
 
 SYMBOL = Rendered(r"\mathbf{u}", "bold(u)")
 DESCRIPTION = Translated({"en": "Velocity"})
