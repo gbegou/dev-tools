@@ -1,41 +1,77 @@
-# Example notations: a few fluid mechanics quantities, in English and French.
+# Example: fluid mechanics notations and acronyms, in English and French.
 version = 1
 languages = ["en", "fr"]  # the first one is the default language
 
-[groups.latin]
-title = { en = "Latin symbols", fr = "Symboles latins" }
+# Vectors in bold: change the template to '\vec{#1}' / 'arrow(#1)' for arrows everywhere.
+[styles.vect]
+template = { latex = '\boldsymbol{#1}', typst = 'bold(#1)' }
+description = { en = "Vector", fr = "Vecteur" }
 
-[groups.greek]
-title = { en = "Greek symbols", fr = "Symboles grecs" }
+[groups.symbols]
+title = { en = "Symbols", fr = "Symboles" }
+
+[groups.symbols.latin]
+title = { en = "Latin letters", fr = "Lettres latines" }
+
+[groups.symbols.greek]
+title = { en = "Greek letters", fr = "Lettres grecques" }
+
+[groups.symbols.subscripts]
+title = { en = "Subscripts", fr = "Indices" }
 
 [groups.operators]
 title = { en = "Operators", fr = "Opérateurs" }
 
+[groups.acronyms]
+title = { en = "Acronyms", fr = "Acronymes" }
+
+[groups.abbreviations]
+title = { en = "Abbreviations", fr = "Abréviations" }
+
 [notations.velocity]
-group = "latin"
-symbol = { latex = '\mathbf{u}', typst = 'bold(upright(u))' }
+group = "symbols.latin"
+style = "vect"
+symbol = 'u'
 description = { en = "Velocity", fr = "Vitesse" }
 units = { latex = '\si{\metre\per\second}', typst = 'm/s' }
 
 [notations.pressure]
-group = "latin"
+group = "symbols.latin"
 symbol = 'p'
 description = { en = "Static pressure", fr = "Pression statique" }
 units = { latex = '\si{\pascal}', typst = 'Pa' }
 
+[notations.redelta]
+group = "symbols.latin"
+sort = "re delta"
+symbol = { latex = '\mathit{Re}_{@{blthickness}}', typst = 'italic("Re")_(@{blthickness})' }
+description = { en = "Reynolds number based on @{blthickness}", fr = "Nombre de Reynolds basé sur @{blthickness}" }
+
 [notations.density]
-group = "greek"
+group = "symbols.greek"
 sort = "rho"
 symbol = { latex = '\rho', typst = 'rho' }
 description = { en = "Density", fr = "Masse volumique" }
 units = { latex = '\si{\kilogram\per\cubic\metre}', typst = 'kg/m#super[3]' }
 
 [notations.viscosity]
-group = "greek"
+group = "symbols.greek"
 sort = "mu"
 symbol = { latex = '\mu', typst = 'mu' }
 description = { en = "Dynamic viscosity", fr = "Viscosité dynamique" }
 units = { latex = '\si{\pascal\second}', typst = 'Pa s' }
+
+[notations.blthickness]
+group = "symbols.greek"
+sort = "delta"
+symbol = { latex = '\delta', typst = 'delta' }
+description = { en = "Boundary-layer thickness", fr = "Épaisseur de couche limite" }
+units = { latex = '\si{\metre}', typst = 'm' }
+
+[notations.freestream]
+group = "symbols.subscripts"
+symbol = { latex = '\infty', typst = 'infinity' }
+description = { en = "Free-stream quantity", fr = "Grandeur de l'écoulement libre" }
 
 [notations.norm]
 group = "operators"
@@ -43,7 +79,18 @@ arguments = 1
 symbol = { latex = '\left\lVert #1 \right\rVert', typst = 'lr(|| #1 ||)' }
 description = { en = "Euclidean norm", fr = "Norme euclidienne" }
 
-[notations.reynolds]
-symbol = { latex = '\mathit{Re}', typst = 'italic("Re")' }
-description.en = { latex = 'Reynolds number, $\rho U L / \mu$', typst = 'Reynolds number, $rho U L \/ mu$' }
-description.fr = { latex = 'Nombre de Reynolds, $\rho U L / \mu$', typst = 'Nombre de Reynolds, $rho U L \/ mu$' }
+[acronyms.cfd]
+group = "acronyms"
+short = { en = "CFD", fr = "MFN" }
+long = { en = "computational fluid dynamics", fr = "mécanique des fluides numérique" }
+
+[acronyms.les]
+group = "acronyms"
+tags = ["turbulence"]
+short = { en = "LES", fr = "SGE" }
+long = { en = "large-eddy simulation", fr = "simulation des grandes échelles" }
+
+[abbreviations.wrt]
+group = "abbreviations"
+short = { en = "w.r.t.", fr = "p.r.à" }
+long = { en = "with respect to", fr = "par rapport à" }

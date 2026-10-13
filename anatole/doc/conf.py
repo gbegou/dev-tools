@@ -24,6 +24,9 @@ nitpicky = True
 nitpick_ignore_regex = [
     # The standard library: no intersphinx, so that the build needs no network.
     ("py:.*", r"(collections|logging|pathlib|tkinter|tomllib|typing)(\..*)?"),
+    # Type aliases (``type X = ...``), which autodoc documents as data, not classes.
+    ("py:class", r"anatole\..*\.(Context|Definition|Entry|FileTypes|Format|Item|Kind|Language)"),
+    ("py:class", r"anatole\..*\.(Pair|Target)"),
 ]
 
 html_theme = "furo"

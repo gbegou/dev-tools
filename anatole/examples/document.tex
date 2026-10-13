@@ -4,14 +4,17 @@
 % [preamble]
 \usepackage{nomencl}
 \makenomenclature
+\usepackage{acro}
 \input{notations}  % exported by: anatole export notations.toml notations.tex
 % [preamble]
 \begin{document}
 % [body]
-The velocity \velocity{} has the norm $\norm{\velocity}$,
-and $\reynolds = \density \lVert \velocity \rVert L / \viscosity$.
+In \ac{cfd}, the velocity \velocity{} has the norm $\norm{\velocity}$, and the boundary layer
+of thickness \blthickness{} has the Reynolds number $\redelta = \density U_{\freestream}
+\blthickness / \viscosity$. \Ac{cfd} and \ac{les} are computed \ac{wrt} it.
 
 \notationnomenclature
 \printnomenclature
+\notationacronyms
 % [body]
 \end{document}

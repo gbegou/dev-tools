@@ -6,7 +6,7 @@ from typing import cast, final, override
 
 import pytest
 
-from anatole import NotationSet, Translated, load, preview
+from anatole import NotationSet, Rendered, Translated, load, preview
 
 try:
     import tkinter as tk
@@ -14,7 +14,7 @@ except ModuleNotFoundError:  # Python built without Tk
     pytest.skip("needs tkinter", allow_module_level=True)
 
 from anatole.gui.app import NotationApp
-from anatole.gui.form import GroupForm, NotationForm
+from anatole.gui.form import GroupForm, ItemForm
 from anatole.gui.groups import GroupsDialog
 from anatole.gui.prompts import FileTypes, Prompts
 
@@ -93,11 +93,21 @@ def edit(app: NotationApp, **fields: str) -> None:
         app.fields[name.replace("_", ":")].set(value)
 
 
+def tree_items(app: NotationApp, node: str = "") -> list[str]:
+    """Return the tree nodes under ``node``, depth first."""
+    found: list[str] = []
+    for child in app.tree.get_children(node):
+        found.append(child)
+        found.extend(tree_items(app, child))
+    return found
+
+
 def tree_names(app: NotationApp) -> list[str]:
+    """Return the entries of the tree, in order (styles aside)."""
     return [
-        child.removeprefix("notation:")
-        for group in app.tree.get_children()
-        for child in app.tree.get_children(group)
+        node.removeprefix("item:")
+        for node in tree_items(app)
+        if node.startswith("item:") and app.tree.parent(node) != "styles"
     ]
 
 
@@ -106,15 +116,15 @@ def test_starts_without_asking(root: tk.Tk, small: NotationSet) -> None:
     window.prompts = ScriptedPrompts(root)
     assert not window.form_modified
     assert window.current is None
-    assert root.title() == "untitled — Anatole"
+    assert root.title() == "untitled — ANATOLE"
     assert tree_names(window) == ["time", "norm", "velocity", "density"]
 
 
 def test_select_shows_the_notation(app: NotationApp, root: tk.Tk) -> None:
-    app.tree.selection_set("notation:density")
+    app.tree.selection_set("item:density")
     root.update()
     assert app.current == "density"
-    assert app.read_form() == NotationForm.from_notation(app.notations["density"])
+    assert app.read_form() == ItemForm.from_item(app.notations["density"])
 
 
 def test_apply_edits_and_renames(app: NotationApp, root: tk.Tk) -> None:
@@ -126,7 +136,7 @@ def test_apply_edits_and_renames(app: NotationApp, root: tk.Tk) -> None:
     assert app.notations["rho"].description["en"].typst == "Mass density"
     assert app.dirty
     assert root.title().startswith("*notations.toml")
-    assert app.tree.selection() == ("notation:rho",)
+    assert app.tree.selection() == ("item:rho",)
 
 
 def test_apply_shows_the_problems(app: NotationApp) -> None:
@@ -134,19 +144,19 @@ def test_apply_shows_the_problems(app: NotationApp) -> None:
     edit(app, symbol_latex=r"\rho{")
     assert not app.apply()
     assert "unbalanced braces" in app.problems.get()
-    assert app.notations["density"].symbol.latex == r"\rho"
+    assert app.notations.notation("density").symbol.latex == r"\rho"
     assert not app.dirty
 
 
 def test_new_notation(app: NotationApp) -> None:
     app.show("velocity")
-    app.new_notation()
+    app.new_item()
     assert app.current is None
-    assert app.read_form() == NotationForm(group="latin")
+    assert app.read_form() == ItemForm(group="latin")
     edit(app, name="pressure", symbol_latex="p", symbol_typst="p")
     edit(app, description_en_latex="Pressure", description_fr_latex="Pression")
     assert app.apply()
-    assert app.notations["pressure"].group == "latin"
+    assert app.notations.notation("pressure").group == "latin"
     assert "pressure" in tree_names(app)
 
 
@@ -154,19 +164,19 @@ def test_unapplied_changes_are_settled(app: NotationApp, root: tk.Tk) -> None:
     app.show("velocity")
     edit(app, description_en_latex="Speed")
     prompts(app).save_answer = None  # cancel: stay on velocity
-    app.tree.selection_set("notation:time")
+    app.tree.selection_set("item:time")
     root.update()
     assert app.current == "velocity"
-    assert app.tree.selection() == ("notation:velocity",)
+    assert app.tree.selection() == ("item:velocity",)
     prompts(app).save_answer = True  # apply, then move
-    app.tree.selection_set("notation:time")
+    app.tree.selection_set("item:time")
     root.update()
     assert app.current == "time"
     assert app.notations["velocity"].description["en"].latex == "Speed"
     app.show("time")
     edit(app, description_en_latex="Duration")
     prompts(app).save_answer = False  # discard
-    app.new_notation()
+    app.new_item()
     assert app.notations["time"].description["en"].latex == "Time"
 
 
@@ -178,7 +188,7 @@ def test_duplicate(app: NotationApp) -> None:
     assert app.read_form().symbol == (r"\mathbf{u}", "bold(u)")
     edit(app, name="speed")
     assert app.apply()
-    assert app.notations["speed"].symbol == app.notations["velocity"].symbol
+    assert app.notations.notation("speed").symbol == app.notations.notation("velocity").symbol
 
 
 def test_delete(app: NotationApp) -> None:
@@ -232,7 +242,7 @@ def test_quit_asks_to_save(app: NotationApp, root: tk.Tk) -> None:
     prompts(app).save_answer = None
     app.quit()  # cancelled: the window stays
     assert root.winfo_exists()
-    assert prompts(app).asked == ["Apply the changes to the notation in the editor?"]
+    assert prompts(app).asked == ["Apply the changes to the item in the editor?"]
 
 
 @pytest.mark.skipif(not preview.is_available(), reason="needs the typst package")
@@ -275,11 +285,7 @@ def test_groups_dialog(app: NotationApp, root: tk.Tk) -> None:
 
 
 def descriptions(app: NotationApp) -> list[str]:
-    return [
-        cast(str, app.tree.set(child, "description"))
-        for group in app.tree.get_children()
-        for child in app.tree.get_children(group)
-    ]
+    return [cast(str, app.tree.set(f"item:{name}", "description")) for name in tree_names(app)]
 
 
 def test_display_language(app: NotationApp, tmp_path: Path) -> None:
@@ -332,3 +338,127 @@ def test_edit_languages(app: NotationApp) -> None:
     assert "description:fr:latex" not in app.fields
     assert app.notations["velocity"].description == Translated({"en": "Velocity"})
     assert cast(tuple[str, ...], app.language_box.cget("values")) == ("en",)
+
+
+@pytest.fixture
+def rich(root: tk.Tk, example: NotationSet, tmp_path: Path) -> NotationApp:
+    window = NotationApp(root, example, tmp_path / "notations.toml")
+    window.prompts = ScriptedPrompts(root)
+    return window
+
+
+def test_tree_of_groups_and_styles(rich: NotationApp) -> None:
+    app = rich
+    assert app.tree.get_children("styles") == ("item:vect",)
+    assert app.tree.get_children("group:symbols") == (
+        "group:symbols.latin",
+        "group:symbols.greek",
+        "group:symbols.subscripts",
+    )
+    assert app.tree.get_children("group:symbols.latin") == (
+        "item:velocity",
+        "item:pressure",
+        "item:redelta",
+    )
+    assert cast(str, app.tree.set("item:wrt", "kind")) == "abbreviation"
+
+
+def test_kind_shows_its_fields(rich: NotationApp, root: tk.Tk) -> None:
+    app = rich
+    root.deiconify()
+    app.show("cfd")
+    root.update()
+    assert app.kind_box.instate(["disabled"])  # an existing item keeps its kind
+    assert not app.symbol_label.winfo_ismapped()
+    app.new_item("style")
+    root.update()
+    assert app.symbol_label.winfo_ismapped()
+    assert app.symbol_label.cget("text") == "Template (#1)"
+    assert app.kind_box.instate(["readonly", "!disabled"])
+
+
+def test_new_acronym(rich: NotationApp) -> None:
+    app = rich
+    app.show("cfd")
+    app.new_item()
+    assert app.read_form().kind == "acronym"
+    assert app.read_form().group == "acronyms"
+    edit(app, name="dns", short_en_latex="DNS", long_en_latex="direct numerical simulation")
+    assert app.apply()
+    dns = app.notations.acronym("dns")
+    assert (dns.short["en"].typst, dns.group) == ("DNS", "acronyms")
+    assert "item:dns" in app.tree.get_children("group:acronyms")
+
+
+def test_style_change_applies_to_every_vector(rich: NotationApp) -> None:
+    app = rich
+    app.show("vect")
+    edit(app, symbol_latex=r"\vec{#1}", symbol_typst="arrow(#1)")
+    assert app.apply()
+    assert app.notations.style("vect").template == Rendered(r"\vec{#1}", "arrow(#1)")
+    assert app.notations.notation("velocity").style == "vect"
+
+
+def test_rename_carries_the_references(rich: NotationApp) -> None:
+    app = rich
+    app.show("blthickness")
+    edit(app, name="delta")
+    assert app.apply()
+    assert app.notations.notation("redelta").symbol.latex == r"\mathit{Re}_{@{delta}}"
+
+
+def test_delete_a_used_item_is_refused(rich: NotationApp) -> None:
+    app = rich
+    app.show("blthickness")
+    app.delete()
+    assert "used by 'redelta'" in prompts(app).errors[-1]
+    assert "blthickness" in app.notations
+
+
+def test_unknown_reference_is_a_problem(rich: NotationApp) -> None:
+    app = rich
+    app.show("pressure")
+    edit(app, symbol_latex="@{nothing}")
+    assert not app.apply()
+    assert "refers to @{nothing}, which is not defined" in app.problems.get()
+
+
+@pytest.mark.skipif(not preview.is_available(), reason="needs the typst package")
+def test_preview_with_references(rich: NotationApp) -> None:
+    app = rich
+    for name in ("redelta", "velocity", "vect", "cfd"):
+        app.show(name)
+        app.update_preview()
+        assert app.preview_image is not None, name
+
+
+def test_export_target(rich: NotationApp, tmp_path: Path) -> None:
+    app = rich
+    app.target.set("glossaries")
+    assert app.export("latex", tmp_path / "notations.tex")
+    text = (tmp_path / "notations.tex").read_text(encoding="utf-8")
+    assert r"\newglossaryentry{velocity}" in text
+
+
+def test_groups_dialog_subsections(rich: NotationApp, root: tk.Tk) -> None:
+    app = rich
+    dialog = GroupsDialog(root, app.notations)
+
+    def fill(form: GroupForm) -> None:
+        for name, value in form.values(app.notations.languages).items():
+            dialog.fields[name].set(value)
+
+    fill(GroupForm("symbols.vectors", {"en": ("Vectors", ""), "fr": ("Vecteurs", "")}))
+    assert dialog.apply()
+    assert dialog.list.get_children("group:symbols")[-1] == "group:symbols.vectors"
+    fill(GroupForm("operators.vectors", {"en": ("Vectors", "")}))
+    assert not dialog.apply()  # a rename keeps the group in its section
+    assert "keeps the group in its section" in dialog.problems.get()
+    fill(GroupForm("a.b.c", {"en": ("Deep", "")}))
+    dialog.new()
+    fill(GroupForm("a.b.c", {"en": ("Deep", "")}))
+    assert not dialog.apply()
+    assert "at most 2 levels" in dialog.problems.get()
+    dialog.window.destroy()
+    app.groups_edited(dialog)
+    assert app.tree.exists("group:symbols.vectors")

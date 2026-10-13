@@ -1,0 +1,16 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{siunitx}
+% [preamble]
+\usepackage[nomain]{glossaries-extra}
+\input{notations}  % exported by: anatole export --latex-target glossaries notations.toml notations.tex
+% [preamble]
+\begin{document}
+% [body]
+In \gls{cfd}, the velocity \velocity{} has the norm $\norm{\velocity}$, and the boundary layer
+of thickness \blthickness{} has the Reynolds number $\redelta = \density U_{\freestream}
+\blthickness / \viscosity$. \Gls{cfd} and \gls{les} are computed \gls{wrt} it.
+
+\notationglossaries
+% [body]
+\end{document}

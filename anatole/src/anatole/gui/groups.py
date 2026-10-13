@@ -1,10 +1,13 @@
-"""The group editor: a dialog to add, rename, retitle, reorder and delete groups."""
+"""The group editor: a dialog to add, rename, retitle, reorder and delete groups.
+
+Groups form a tree: a key ``symbols.latin`` makes a subsection of the section ``symbols``.
+"""
 
 import tkinter as tk
 from tkinter import ttk
 from typing import final
 
-from anatole.gui.form import GroupForm, title_key
+from anatole.gui.form import GroupForm, language_key
 from anatole.model import NotationError, NotationSet
 from anatole.typing import FORMATS
 
@@ -72,7 +75,7 @@ class GroupsDialog:
                 row=row, column=0, sticky="w", pady=2
             )
             for column, fmt in enumerate(FORMATS, start=1):
-                var = self.fields[title_key(language, fmt)]
+                var = self.fields[language_key("title", language, fmt)]
                 ttk.Entry(editor, textvariable=var, width=24).grid(
                     row=row, column=column, sticky="ew", pady=2, padx=4
                 )
@@ -95,7 +98,9 @@ class GroupsDialog:
     def _refresh(self) -> None:
         self.list.delete(*self.list.get_children())
         for group in self.notations.groups:
-            _ = self.list.insert("", "end", iid=f"group:{group.key}", text=group.key)
+            parent = f"group:{group.parent}" if group.parent else ""
+            text = group.key.rpartition(".")[2]
+            _ = self.list.insert(parent, "end", iid=f"group:{group.key}", text=text, open=True)
         item = f"group:{self.current}"
         if self.current is not None and self.list.exists(item):
             self.list.selection_set(item)

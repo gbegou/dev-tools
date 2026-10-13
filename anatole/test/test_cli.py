@@ -19,7 +19,10 @@ def test_version(capsys: pytest.CaptureFixture[str]) -> None:
 
 def test_check(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
     assert main(["check", str(EXAMPLE)]) == 0
-    assert "6 notations, 3 groups, languages en, fr, valid\n" in capsys.readouterr().out
+    assert (
+        "8 notations, 3 acronyms and abbreviations, 1 styles, 7 groups, languages en, fr, valid\n"
+        in capsys.readouterr().out
+    )
 
     bad = tmp_path / "bad.toml"
     _ = bad.write_text("[notations.x]\nsymbol = 'x'\n", encoding="utf-8")
@@ -34,11 +37,21 @@ def test_check(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
 def test_list(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["list", str(EXAMPLE)]) == 0
     lines = capsys.readouterr().out.splitlines()
-    assert lines[0].split() == ["name", "group", "symbol", "description"]
-    assert lines[1].split()[:3] == ["velocity", "latin", r"\mathbf{u}"]
+    assert lines[0].split() == ["kind", "name", "group", "symbol", "description"]
+    assert lines[1].split() == ["style", "vect", r"\boldsymbol{#1}"]
+    assert lines[2].split() == ["notation", "velocity", "symbols.latin", "u", "Velocity"]
+    assert lines[-1].split() == [
+        "abbreviation",
+        "wrt",
+        "abbreviations",
+        "w.r.t.",
+        "with",
+        "respect",
+        "to",
+    ]
     assert main(["list", "--format", "typst", "--language", "fr", str(EXAMPLE)]) == 0
     output = capsys.readouterr().out
-    assert "bold(upright(u))" in output
+    assert "bold(#1)" in output
     assert "Vitesse" in output
     assert main(["list", "-l", "de", str(EXAMPLE)]) == 1
 
@@ -51,6 +64,8 @@ def test_list(capsys: pytest.CaptureFixture[str]) -> None:
         ("notations.txt", ["--format", "typst"], "#let velocity ="),
         ("notations.tex", ["--language", "fr"], "{Vitesse"),
         ("notations.typ", ["-l", "fr"], "[Vitesse]"),
+        ("notations.tex", ["--latex-target", "glossaries"], r"\newglossaryentry{velocity}"),
+        ("notations.tex", ["-t", "nomencl+acro"], r"\DeclareAcronym{cfd}"),
     ],
 )
 def test_export(tmp_path: Path, name: str, options: list[str], expected: str) -> None:
@@ -106,3 +121,15 @@ def test_verbose_logs(caplog: pytest.LogCaptureFixture, tmp_path: Path) -> None:
         assert main(["-v", "export", str(path), str(tmp_path / "out.typ")]) == 0
     assert "exported 0 notations" in caplog.text
     assert load(path) == NotationSet()
+
+
+def test_tags(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
+    assert main(["list", "--tag", "nothing", str(EXAMPLE)]) == 0
+    assert "les" not in capsys.readouterr().out.split()
+    assert main(["list", "--tag", "turbulence", str(EXAMPLE)]) == 0
+    assert "les" in capsys.readouterr().out.split()
+    output = tmp_path / "notations.typ"
+    assert main(["export", "--tag", "nothing", str(EXAMPLE), str(output)]) == 0
+    text = output.read_text(encoding="utf-8")
+    assert "#let cfd =" in text
+    assert "#let les =" not in text

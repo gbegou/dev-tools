@@ -27,15 +27,28 @@ def problems(text: str) -> tuple[str, ...]:
 
 
 def test_example_loads(example: NotationSet) -> None:
-    assert len(example) == 6
-    assert [g.key for g in example.groups] == ["latin", "greek", "operators"]
-    assert example["velocity"].symbol == Rendered(r"\mathbf{u}", "bold(upright(u))")
+    assert (len(example.notations), len(example.acronyms), len(example.styles)) == (8, 3, 1)
+    assert [g.key for g in example.groups] == [
+        "symbols",
+        "symbols.latin",
+        "symbols.greek",
+        "symbols.subscripts",
+        "operators",
+        "acronyms",
+        "abbreviations",
+    ]
     assert example.languages == ("en", "fr")
-    assert example["velocity"].description == Translated({"en": "Velocity", "fr": "Vitesse"})
-    assert example["reynolds"].description["fr"].typst == "Nombre de Reynolds, $rho U L \\/ mu$"
-    assert example.group("operators").title["fr"] == Rendered.both("Opérateurs")
-    assert example["norm"].arguments == 1
-    assert example["density"].sort == "rho"
+    velocity = example.notation("velocity")
+    assert (velocity.symbol, velocity.style) == (Rendered.both("u"), "vect")
+    assert velocity.description == Translated({"en": "Velocity", "fr": "Vitesse"})
+    assert example.style("vect").template == Rendered(r"\boldsymbol{#1}", "bold(#1)")
+    assert example.notation("redelta").references() == ["blthickness"]
+    assert example.notation("norm").arguments == 1
+    cfd = example.acronym("cfd")
+    assert cfd.short == Translated({"en": "CFD", "fr": "MFN"})
+    assert not cfd.abbreviation
+    assert example.acronym("wrt").abbreviation
+    assert example.acronym("les").tags == ("turbulence",)
 
 
 def test_round_trip(example: NotationSet, small: NotationSet) -> None:
@@ -163,19 +176,20 @@ def test_every_problem_is_reported() -> None:
         """
     )
     assert found == (
-        "file: unknown key(s) colour (expected version, languages, groups, notations)",
-        "group 'latin': unknown key(s) titel (expected title)",
+        "file: unknown key(s) colour (expected version, languages, styles, groups, notations, "
+        + "acronyms, abbreviations)",
         "group 'latin': title is missing",
+        "group 'latin': unknown key titel (expected title, or a table for a subsection)",
         "group 'greek': title.en.typst must be a string",
         "group 'ops': title mixes languages and formats: "
         + "write title.<language> = { latex = ..., typst = ... }",
         "notation 'velocity': unknown key(s) unit "
-        + "(expected group, arguments, sort, symbol, description, units)",
+        + "(expected group, style, arguments, sort, tags, symbol, description, units)",
         "notation 'velocity': symbol has unknown format(s) html (expected latex, typst)",
-        "notation 'pressure': description is missing",
         "notation 'pressure': group must be a string",
         "notation 'pressure': sort must be a string",
         "notation 'pressure': arguments must be an integer",
+        "notation 'pressure': description is missing",
         "notation 'pressure': symbol must be a string or a table with keys latex and typst",
         "notation 'density': symbol is missing",
         "notation 'viscosity': description must be a string or a table with one entry per "
@@ -213,4 +227,74 @@ def test_languages_must_be_a_list_of_codes() -> None:
 def test_undeclared_languages() -> None:
     assert problems("[notations.ab]\nsymbol = 'x'\ndescription = { en = 'a', de = 'b' }") == (
         "notation 'ab': description is in de, which is not a declared language (en)",
+    )
+
+
+def test_styles_acronyms_and_tree_round_trip() -> None:
+    text = """
+languages = ["en", "fr"]
+
+[styles.vect]
+template = { latex = '\\vec{#1}', typst = 'arrow(#1)' }
+
+[groups.symbols]
+title = "Symbols"
+
+[groups.symbols.latin]
+title = { en = "Latin", fr = "Latin" }
+
+[notations.velocity]
+group = "symbols.latin"
+style = "vect"
+tags = ["thesis", "paper"]
+symbol = "u"
+description = "Velocity"
+
+[acronyms.cfd]
+short = { en = "CFD", fr = "MFN" }
+long = "computational fluid dynamics"
+description = "Numerical simulation of flows"
+
+[abbreviations.wrt]
+sort = "w"
+short = "w.r.t."
+long = "with respect to"
+"""
+    notations = loads(text)
+    assert notations.notation("velocity").tags == ("thesis", "paper")
+    assert notations.group("symbols.latin").parent == "symbols"
+    assert notations.acronym("wrt").abbreviation
+    assert notations.acronym("cfd").description == Translated(
+        {"en": "Numerical simulation of flows"}
+    )
+    dumped = dumps(notations)
+    assert "[groups.symbols.latin]" in dumped
+    assert "[abbreviations.wrt]" in dumped
+    assert "tags = ['thesis', 'paper']" in dumped
+    assert loads(dumped) == notations
+
+
+def test_acronym_problems() -> None:
+    assert problems("[acronyms.cfd]\nshort = 'CFD'\ntags = 'x'\nlong = 3") == (
+        "acronym 'cfd': tags must be a list of strings",
+        "acronym 'cfd': long must be a string or a table with one entry per language",
+    )
+    assert problems("[abbreviations.wrt]\nshort = 'w.r.t.'") == (
+        "abbreviation 'wrt': long is missing",
+    )
+
+
+def test_style_problems() -> None:
+    assert problems("[styles.vect]\ndescription = 'Vector'") == (
+        "style 'vect': template is missing",
+    )
+    assert problems("[styles.vect]\ntemplate = '#2'") == (
+        "style 'vect': template uses #2 in latex, but takes 1 argument(s) (#1 to #1)",
+        "style 'vect': template uses #2 in typst, but takes 1 argument(s) (#1 to #1)",
+    )
+
+
+def test_reference_problems() -> None:
+    assert problems("[notations.re]\nsymbol = '@{delta}'\ndescription = 'x'") == (
+        "notation 're': refers to @{delta}, which is not defined",
     )

@@ -7,12 +7,13 @@ Layout
 .. code-block:: text
 
    src/anatole/
-       model.py          Rendered, Translated, Notation, Group, NotationSet: validation and
-                         editing
+       model/            texts.py (Rendered, Translated, references, checks), entries.py
+                         (Notation, Acronym, Style, Group), notations.py (NotationSet:
+                         consistency, renames, group tree, sections, tags)
        io.py             notation files (TOML): read, write, to and from dicts
-       export/_common.py the language of an export
-       export/latex.py   LaTeX export (commands, nomencl entries)
-       export/typst.py   Typst export (variables and functions, nomenclature)
+       export/_common.py what the exports share: language, references, styles
+       export/latex.py   LaTeX export (commands; nomencl and acro, or glossaries-extra)
+       export/typst.py   Typst export (functions, variables, acronyms, lists)
        preview.py        Typst rendering of a notation (optional typst package)
        cli.py            command line
        gui/              Tkinter interface: app (main window), groups (group editor),
@@ -40,9 +41,11 @@ Conventions
 - A notation, group or file problem is a :class:`~anatole.model.NotationError`
   whose ``problems`` list every problem, each naming the notation (or group) and the field.
   Functions that read user input report every problem at once, never the first only.
+- A change to a notation set either keeps it consistent or raises, leaving it as it was: the
+  set checks the whole of it after each change (references, cycles, groups, languages).
 - The model knows nothing of the interface; the interface logic that needs no display
   (forms, search) is in ``gui/form.py``, tested without Tk.
-- The names the exports define are reserved (:data:`~anatole.model.RESERVED_NAMES`):
+- The names the exports define are reserved (``RESERVED_NAMES`` in ``anatole.model``):
   a new LaTeX helper is a reserved letters-only name, a new Typst helper a hyphenated name
   (which no notation can take).
 

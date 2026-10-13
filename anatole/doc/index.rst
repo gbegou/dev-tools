@@ -3,25 +3,32 @@ ANATOLE
 
 **A**\ NATOLE is a **N**\ otations **A**\ nd acronyms manager with **T**\ ypst **O**\ r **L**\ aTeX **E**\ xporters.
 
-Define each notation once, in a notation file, and use it in **LaTeX** and **Typst**, in
-**English**, **French** or any other language: a command name, a symbol and units written
-once per format, and a description written once per language.
+Define each notation, acronym and abbreviation once, in a notation file, and use it in
+**LaTeX** and **Typst**, in **English**, **French** or any other language.
 
 .. code-block:: toml
 
    languages = ["en", "fr"]
 
+   [styles.vect]
+   template = { latex = '\boldsymbol{#1}', typst = 'bold(#1)' }
+
    [notations.velocity]
-   symbol = { latex = '\mathbf{u}', typst = 'bold(upright(u))' }
+   style = "vect"
+   symbol = 'u'
    description = { en = "Velocity", fr = "Vitesse" }
    units = { latex = '\si{\metre\per\second}', typst = 'm/s' }
 
-From this file, ``anatole`` exports a LaTeX file (one command per notation, and the
-entries of a ``nomencl`` nomenclature) and a Typst file (one variable or function per
-notation, and a nomenclature), in the language of the document, so that ``\velocity`` and
-``$velocity$`` render the same symbol and the nomenclature lists it with its description in
-that language. A graphical interface browses, searches, creates, edits and translates the
-notations, with a Typst preview.
+   [acronyms.cfd]
+   short = { en = "CFD", fr = "MFN" }
+   long = { en = "computational fluid dynamics", fr = "mécanique des fluides numérique" }
+
+From this file, ``anatole`` exports a LaTeX file (commands, and lists for ``nomencl`` and
+``acro``, or ``glossaries-extra``) and a Typst file (variables, functions, acronyms that expand
+at their first use, and lists), in the language of the document. Entries refer to each other
+(``@{blthickness}`` in the symbol of ``\redelta``), styles change every vector at once, groups
+form sections and subsections, and tags select the entries of each document. A graphical
+interface browses, searches, creates, edits and translates them, with a Typst preview.
 
 .. toctree::
    :maxdepth: 2

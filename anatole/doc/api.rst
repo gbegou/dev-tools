@@ -5,7 +5,8 @@ The package exports the model, the file functions and the exports:
 
 .. code-block:: python
 
-   from anatole import Group, Notation, NotationSet, Rendered, load, save, export
+   from anatole import Acronym, Group, Notation, NotationSet, Rendered, Style, Translated
+   from anatole import export, load, save
 
 Model
 -----

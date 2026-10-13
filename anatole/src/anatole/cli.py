@@ -7,9 +7,9 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from anatole import __version__
-from anatole.export import SUFFIXES, export
+from anatole.export import SUFFIXES, TARGETS, Target, export
 from anatole.io import load
-from anatole.model import NotationError
+from anatole.model import Notation, NotationError
 from anatole.typing import FORMATS, Format, Language
 
 __all__ = ["main"]
@@ -26,6 +26,8 @@ class _Arguments(argparse.Namespace):
     format: Format | None = None
     language: Language | None = None
     strict: bool = False
+    target: Target = "nomencl+acro"
+    tags: list[str] | None = None
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -50,6 +52,13 @@ def _parser() -> argparse.ArgumentParser:
     list_ = commands.add_parser("list", help="list the notations of a file")
     _ = list_.add_argument("file", type=Path)
     _ = list_.add_argument(
+        "--tag",
+        action="append",
+        dest="tags",
+        metavar="TAG",
+        help="list the entries selected by this tag (repeat for several)",
+    )
+    _ = list_.add_argument(
         "-f", "--format", choices=FORMATS, help="the format of the symbols (default: latex)"
     )
     _ = list_.add_argument(
@@ -69,6 +78,22 @@ def _parser() -> argparse.ArgumentParser:
     _ = export_.add_argument("output", type=Path, help="the file to write")
     _ = export_.add_argument("-f", "--format", choices=FORMATS, help="the target format")
     _ = export_.add_argument("-l", "--language", help="the language of the descriptions")
+    _ = export_.add_argument(
+        "-t",
+        "--latex-target",
+        dest="target",
+        choices=TARGETS,
+        default=TARGETS[0],
+        help="the LaTeX packages of the lists (default: %(default)s)",
+    )
+    _ = export_.add_argument(
+        "--tag",
+        action="append",
+        dest="tags",
+        metavar="TAG",
+        help="export the entries selected by this tag (repeat for several): those with the "
+        + "tag, those without tags, and the entries they use",
+    )
     return parser
 
 
@@ -83,8 +108,9 @@ def _check(files: Sequence[Path], *, strict: bool) -> int:
             continue
         missing = notations.missing_translations()
         print(
-            f"{file}: {len(notations)} notations, {len(notations.groups)} groups, languages "
-            + f"{', '.join(notations.languages)}, valid"
+            f"{file}: {len(notations.notations)} notations, {len(notations.acronyms)} acronyms "
+            + f"and abbreviations, {len(notations.styles)} styles, {len(notations.groups)} "
+            + f"groups, languages {', '.join(notations.languages)}, valid"
             + (f", {len(missing)} missing translations" if missing else "")
         )
         for problem in missing:
@@ -94,26 +120,41 @@ def _check(files: Sequence[Path], *, strict: bool) -> int:
     return status
 
 
-def _list(file: Path, fmt: Format, language: Language | None) -> int:
+def _list(file: Path, fmt: Format, language: Language | None, tags: list[str] | None) -> int:
     notations = load(file)
     language = language or notations.default_language
     notations.check_language(language)
+    if tags is not None:
+        notations = notations.subset(tags)
     default = notations.default_language
-    rows = [("name", "group", "symbol", "description")]
-    rows.extend(
-        (n.name, n.group, n.symbol.get(fmt), n.description.resolve(language, default).get(fmt))
-        for n in notations
-    )
-    widths = [max(len(row[column]) for row in rows) for column in range(3)]
+    rows = [("kind", "name", "group", "symbol", "description")]
+    for style in notations.styles:
+        rows.append(("style", style.name, "", style.template.get(fmt), ""))
+    for entry in notations:
+        if isinstance(entry, Notation):
+            text = entry.description.resolve(language, default).get(fmt)
+            rows.append(("notation", entry.name, entry.group, entry.symbol.get(fmt), text))
+        else:
+            short = entry.short.resolve(language, default).get(fmt)
+            long = entry.long.resolve(language, default).get(fmt)
+            rows.append((entry.kind, entry.name, entry.group, short, long))
+    widths = [max(len(row[column]) for row in rows) for column in range(4)]
     for row in rows:
-        print(
-            "  ".join(cell.ljust(width) for cell, width in zip(row, widths, strict=False)), row[3]
-        )
+        cells = (cell.ljust(width) for cell, width in zip(row, widths, strict=False))
+        print("  ".join([*cells, row[4]]).rstrip())
     return 0
 
 
-def _export(file: Path, output: Path, fmt: Format | None, language: Language | None) -> int:
-    export(load(file), output, fmt, language=language, source=file.name)
+def _export(
+    file: Path,
+    output: Path,
+    fmt: Format | None,
+    language: Language | None,
+    *,
+    target: Target,
+    tags: list[str] | None,
+) -> int:
+    export(load(file), output, fmt, language=language, target=target, tags=tags, source=file.name)
     print(f"{output}: written")
     return 0
 
@@ -134,9 +175,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             case "check":
                 return _check(arguments.files, strict=arguments.strict)
             case "list" if file is not None:
-                return _list(file, arguments.format or "latex", arguments.language)
+                return _list(file, arguments.format or "latex", arguments.language, arguments.tags)
             case "export" if file is not None and output is not None:
-                return _export(file, output, arguments.format, arguments.language)
+                return _export(
+                    file,
+                    output,
+                    arguments.format,
+                    arguments.language,
+                    target=arguments.target,
+                    tags=arguments.tags,
+                )
             case _:
                 from anatole.gui import run  # noqa: PLC0415  # tkinter only when needed
 

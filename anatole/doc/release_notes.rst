@@ -6,21 +6,33 @@ Release notes
 
 First version.
 
-- Notation files (TOML): notations with a command name, a symbol and units written per
-  format (LaTeX, Typst, or once for both), a description written per language (English,
-  French...: the languages are declared in the file, the first one is the default), a
-  group, a number of arguments and a sort key; groups with a title per language. Every
-  problem of a file is reported at once, naming the notation and the field; the
-  translations missing are listed.
+- Notation files (TOML) with three kinds of entries and styles:
+
+  - notations: a command name, a symbol and units written per format (LaTeX, Typst, or once
+    for both), a description written per language, a number of arguments, a style;
+  - acronyms (expanded at their first use) and abbreviations (never expanded): a short and a
+    long form per language, an optional description;
+  - styles: templates applied to symbols (vectors in bold, or with an arrow), changed in one
+    place for every symbol that uses them.
+
+- Languages declared in the file, the first one the default; the translations in the other
+  languages are optional, and listed when missing.
+- References between entries, ``@{name}``, checked (existence, no cycle), followed by
+  renames, and expanded by the exports (``\redelta`` uses ``\blthickness``).
+- A tree of groups (sections and subsections) that heads the lists, and tags that select
+  the entries of a document.
+- Every problem of a file is reported at once, naming the entry and the field.
+- LaTeX export, with two targets for the lists: ``nomencl`` and ``acro`` (the default), or
+  ``glossaries-extra`` (one glossary per group, no external tool). Commands for the styles
+  and notations, each after the ones it uses.
+- Typst export: functions for the styles, variables (or functions) for the notations,
+  acronyms that expand at their first use, ``notation-nomenclature()`` and
+  ``notation-acronyms()``.
 - Exports in a chosen language, falling back on the default language (with a warning) for
   the translations missing.
-- LaTeX export: one command per notation (``\newcommand``, with ``\ensuremath``), and
-  ``\notationnomenclature`` that declares the ``nomencl`` entries, sorted by group then sort
-  key, with group titles and units (``\nomunit``).
-- Typst export: one variable per notation, or an anonymous function of its arguments, and
-  ``notation-nomenclature()``.
-- Graphical interface (Tkinter): a searchable tree by group, an editor with a description
-  per language, a language selector, a group editor, a languages dialog, a Typst preview
-  (with the optional ``typst`` package), open, save and export.
+- Graphical interface (Tkinter): a searchable tree of styles and entries by group, an editor
+  for each kind with a text per language, a language selector, a group editor, a languages
+  dialog, a Typst preview with the entries an item uses (with the optional ``typst``
+  package), open, save and export.
 - Command line: ``gui``, ``check`` (``--strict`` for missing translations), ``list`` and
-  ``export`` (``--format``, ``--language``).
+  ``export`` (``--format``, ``--language``, ``--latex-target``, ``--tag``).

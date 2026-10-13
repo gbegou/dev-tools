@@ -3,8 +3,11 @@
 #import "notations.typ": *
 // [import]
 // [body]
-The velocity $velocity$ has the norm $norm(velocity)$,
-and $reynolds = density norm(velocity) L \/ viscosity$.
+In #cfd, the velocity $velocity$ has the norm $norm(velocity)$, and the boundary layer of
+thickness $blthickness$ has the Reynolds number
+$redelta = density U_freestream blthickness \/ viscosity$.
+#cfd and #les are computed #wrt it.
 
 #notation-nomenclature()
+#notation-acronyms()
 // [body]

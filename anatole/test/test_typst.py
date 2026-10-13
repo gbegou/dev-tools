@@ -6,7 +6,15 @@ from pathlib import Path
 
 import pytest
 
-from anatole import Notation, NotationError, NotationSet, Rendered, Translated, to_typst
+from anatole import (
+    Acronym,
+    Notation,
+    NotationError,
+    NotationSet,
+    Rendered,
+    Translated,
+    to_typst,
+)
 
 
 def test_variables_and_functions(small: NotationSet) -> None:
@@ -48,6 +56,34 @@ def test_language(small: NotationSet) -> None:
     assert "description: [Density]" in text  # no French translation: English
     with pytest.raises(NotationError, match="language 'de' is not declared"):
         _ = to_typst(small, language="de")
+
+
+def test_styles_references_and_order(example: NotationSet) -> None:
+    text = to_typst(example)
+    assert "#let vect = (arg1) => $bold(#(arg1))$" in text
+    assert "#let velocity = $vect(u)$" in text
+    assert '#let redelta = $italic("Re")_(#blthickness)$' in text
+    assert "description: [Reynolds number based on #blthickness]" in text
+    lets = [line.split(" =")[0] for line in text.splitlines() if line.startswith("#let ")]
+    assert lets.index("#let vect") < lets.index("#let velocity")
+    assert lets.index("#let blthickness") < lets.index("#let redelta")
+
+
+def test_reference_ends_before_a_letter() -> None:
+    notations = NotationSet(
+        [
+            Notation("blthickness", Rendered.both("delta"), Translated({"en": "x"})),
+            Notation("ratio", Rendered.both("@{blthickness}x"), Translated({"en": "x"})),
+        ]
+    )
+    assert "#let ratio = $#blthickness;x$" in to_typst(notations)
+
+
+def test_acronyms(example: NotationSet) -> None:
+    text = to_typst(example, language="fr")
+    assert '#let cfd = anatole-acronym("cfd", [MFN], [mécanique des fluides numérique], ' in text
+    assert '#let wrt = anatole-acronym("wrt", [p.r.à], [par rapport à], expand: false)' in text
+    assert "#let acronym-groups = (" in text
 
 
 typst_available = importlib.util.find_spec("typst") is not None
@@ -101,3 +137,40 @@ def test_notations_using_the_builtin_they_shadow_compile(tmp_path: Path) -> None
         encoding="utf-8",
     )
     assert typst.compile(str(tmp_path / "document.typ")).startswith(b"%PDF")
+
+
+FIRST_USE = """\
+#import "notations.typ": *
+#cfd, #cfd, #wrt.
+#context assert.eq(anatole-acronyms-used.final(), ("cfd", "wrt"))
+"""
+
+
+@pytest.mark.skipif(not typst_available, reason="needs the typst package")
+@pytest.mark.skipif(shutil.which("pdftotext") is None, reason="needs pdftotext")
+def test_acronyms_expand_at_first_use(tmp_path: Path) -> None:
+    import subprocess
+
+    import typst
+
+    notations = NotationSet(
+        [
+            Acronym("cfd", Translated({"en": "CFD"}), Translated({"en": "fluid dynamics"})),
+            Acronym(
+                "wrt",
+                Translated({"en": "w.r.t."}),
+                Translated({"en": "with respect to"}),
+                abbreviation=True,
+            ),
+        ]
+    )
+    _ = (tmp_path / "notations.typ").write_text(to_typst(notations), encoding="utf-8")
+    _ = (tmp_path / "document.typ").write_text(FIRST_USE, encoding="utf-8")
+    _ = (tmp_path / "document.pdf").write_bytes(typst.compile(str(tmp_path / "document.typ")))
+    text = subprocess.run(
+        ["pdftotext", str(tmp_path / "document.pdf"), "-"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    assert "fluid dynamics (CFD), CFD, w.r.t.." in " ".join(text.split())

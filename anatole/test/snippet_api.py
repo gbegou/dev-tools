@@ -31,14 +31,14 @@ def snippet_api(tmp_path: Path) -> None:
     notations = load(tmp_path / "notations.toml")
     export(notations, tmp_path / "notations.tex")  # the format follows the suffix
     export(notations, tmp_path / "notations-fr.typ", language="fr")
-    print(to_typst(notations, language="fr").splitlines()[6])  # #let velocity = ...
+    print(to_typst(notations, language="fr"))  # #let velocity = $bold(upright(u))$ ...
     # [export]
 
     latex = (tmp_path / "notations.tex").read_text(encoding="utf-8")
     assert "\\newcommand{\\velocity}" in latex
     assert "{Velocity\\nomunit" in latex
     assert "[Vitesse]" in (tmp_path / "notations-fr.typ").read_text(encoding="utf-8")
-    assert to_typst(notations).splitlines()[6] == "#let velocity = $bold(upright(u))$"
+    assert "#let velocity = $bold(upright(u))$" in to_typst(notations).splitlines()
 
 
 def snippet_errors() -> None:
