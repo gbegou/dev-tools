@@ -33,6 +33,8 @@ Exports
 
 .. automodule:: anatole.export.typst
 
+.. automodule:: anatole.export.office
+
 Preview
 -------
 

@@ -28,6 +28,8 @@ First version.
 - Typst export: functions for the styles, variables (or functions) for the notations,
   acronyms that expand at their first use, ``notation-nomenclature()`` and
   ``notation-acronyms()``.
+- Word export (``.docx``, with pandoc): the lists, with the symbols as Word equations and the
+  siunitx units converted; what cannot be converted is reported by entry.
 - Exports in a chosen language, falling back on the default language (with a warning) for
   the translations missing.
 - Graphical interface (Tkinter): a searchable tree of styles and entries by group, an editor

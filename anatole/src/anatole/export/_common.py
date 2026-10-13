@@ -6,6 +6,7 @@ with arguments) or the acronym (``\ac{cfd}``, ``\gls{cfd}``); in Typst, the vari
 """
 
 import re
+from collections.abc import Callable
 from typing import Literal
 
 from anatole.logging import get_logger
@@ -55,6 +56,7 @@ def expand(
     context: Context,
     *,
     acronym_command: str = "ac",
+    acronym_text: Callable[[Acronym], str] | None = None,
 ) -> str:
     """Return ``text`` with its references ``@{name}`` written in the format ``fmt``.
 
@@ -70,6 +72,9 @@ def expand(
         Whether the text is math (symbols, templates) or text (descriptions).
     acronym_command
         The LaTeX command that prints an acronym (``ac`` for acro, ``gls`` for glossaries).
+    acronym_text
+        The LaTeX text of an acronym, instead of the command (for a document without
+        acronym package).
     """
 
     def replace(match: re.Match[str]) -> str:
@@ -78,6 +83,8 @@ def expand(
         after = text[match.end() : match.end() + 1]
         if fmt == "latex":
             if isinstance(item, Acronym):
+                if acronym_text is not None:
+                    return acronym_text(item)
                 return rf"\{acronym_command}{{{name}}}"
             # Braces keep the spaces after a command; arguments follow a command that takes some.
             return rf"\{name}" if _takes_arguments(item) else rf"{{\{name}}}"

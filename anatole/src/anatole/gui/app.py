@@ -8,21 +8,23 @@ from tkinter import ttk
 from typing import final
 
 from anatole import preview
-from anatole.export import TARGETS, Target, export
+from anatole.export import TARGETS, OfficeError, Output, Target, export
 from anatole.gui.form import KINDS, ItemForm, Kind, kind_of, language_key, matches
 from anatole.gui.groups import GroupsDialog
 from anatole.gui.prompts import FileTypes, Prompts
 from anatole.io import load, save
 from anatole.model import Acronym, Item, Notation, NotationError, NotationSet, Style, Translated
-from anatole.typing import FORMATS, Format
+from anatole.typing import FORMATS
 
 __all__ = ["NotationApp"]
 
 NOTATION_FILES: FileTypes = [("Notation files", "*.toml"), ("All files", "*")]
-EXPORT_FILES: dict[Format, FileTypes] = {
+EXPORT_FILES: dict[Output, FileTypes] = {
     "latex": [("LaTeX", "*.tex"), ("All files", "*")],
     "typst": [("Typst", "*.typ"), ("All files", "*")],
+    "docx": [("Word", "*.docx"), ("All files", "*")],
 }
+EXPORT_SUFFIXES: dict[Output, str] = {"latex": ".tex", "typst": ".typ", "docx": ".docx"}
 NO_GROUP = "(no group)"
 STYLES = "Styles"
 PREVIEW_DELAY_MS = 400
@@ -166,6 +168,7 @@ class NotationApp:
         file.add_separator()
         file.add_command(label="Export to LaTeX…", command=lambda: self.export("latex"))
         file.add_command(label="Export to Typst…", command=lambda: self.export("typst"))
+        file.add_command(label="Export to Word…", command=lambda: self.export("docx"))
         file.add_separator()
         file.add_command(label="Quit", command=self.quit)
         menu.add_cascade(label="File", menu=file)
@@ -731,14 +734,15 @@ class NotationApp:
         self.path = path
         return self.save()
 
-    def export(self, fmt: Format, path: Path | None = None) -> bool:
-        """Export to the format ``fmt``, in the selected language (and LaTeX target).
+    def export(self, fmt: Output, path: Path | None = None) -> bool:
+        """Export to ``fmt`` (LaTeX, Typst or Word), in the selected language (and LaTeX target).
 
-        Write to ``path``, asked for when ``None``; return whether it exported.
+        Write to ``path``, asked for when ``None``; return whether it exported. The problems of
+        a Word export (units or math it cannot convert) are shown.
         """
         if not self._settle_form():
             return False
-        suffix = ".tex" if fmt == "latex" else ".typ"
+        suffix = EXPORT_SUFFIXES[fmt]
         path = path or self.prompts.save_path(EXPORT_FILES[fmt], suffix)
         if path is None:
             return False
@@ -746,10 +750,14 @@ class NotationApp:
         language = self.language.get()
         target: Target = "glossaries" if self.target.get() == "glossaries" else "nomencl+acro"
         try:
-            export(self.notations, path, fmt, language=language, target=target, source=source)
-        except (OSError, NotationError) as error:
+            problems = export(
+                self.notations, path, fmt, language=language, target=target, source=source
+            )
+        except (OSError, NotationError, OfficeError) as error:
             self.prompts.error(str(error))
             return False
+        if problems:
+            self.prompts.error(f"Exported to {path}, with these problems:\n" + "\n".join(problems))
         self._status.set(f"Exported to {path} ({language})")
         return True
 

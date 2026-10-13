@@ -13,6 +13,7 @@ try:
 except ModuleNotFoundError:  # Python built without Tk
     pytest.skip("needs tkinter", allow_module_level=True)
 
+from anatole.export import office
 from anatole.gui.app import NotationApp
 from anatole.gui.form import GroupForm, ItemForm
 from anatole.gui.groups import GroupsDialog
@@ -462,3 +463,16 @@ def test_groups_dialog_subsections(rich: NotationApp, root: tk.Tk) -> None:
     dialog.window.destroy()
     app.groups_edited(dialog)
     assert app.tree.exists("group:symbols.vectors")
+
+
+@pytest.mark.skipif(not office.is_available(), reason="needs pandoc (anatole[office])")
+def test_export_to_word(rich: NotationApp, tmp_path: Path) -> None:
+    app = rich
+    assert app.export("docx", tmp_path / "notations.docx")
+    assert (tmp_path / "notations.docx").exists()
+    assert prompts(app).errors == []
+    app.show("pressure")
+    edit(app, units_latex=r"\si{\furlong}", units_typst="furlong")
+    assert app.apply()
+    assert app.export("docx", tmp_path / "other.docx")
+    assert "pressure': Word: \\furlong is not converted" in prompts(app).errors[-1]

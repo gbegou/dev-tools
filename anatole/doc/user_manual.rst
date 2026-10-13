@@ -12,6 +12,7 @@ interface needs the ``typst`` package:
 
    $ pip install anatole             # or: pip install -e . from a checkout
    $ pip install 'anatole[preview]'  # with the Typst preview
+   $ pip install 'anatole[office]'   # with the Word export (pandoc)
 
 This installs the ``anatole`` command (also ``python -m anatole``).
 
@@ -381,6 +382,40 @@ and ``subsections`` (sections themselves); a notation has ``name``, ``symbol``,
   builtin ``norm``: an anonymous function does not see its own name).
 - The helpers have hyphenated names, which no entry can take.
 
+Word
+----
+
+Word has no commands like ``\velocity``: the export to Word is the **lists**, the nomenclature
+and the acronyms, as a ``.docx`` document to copy into a report or to attach to it::
+
+   anatole export notations.toml notations.docx
+   anatole export --language fr --reference-doc my-template.docx notations.toml notations.docx
+
+(or *File › Export to Word* in the interface). It needs pandoc, which ``pip install
+'anatole[office]'`` installs (the ``pypandoc-binary`` package).
+
+.. literalinclude:: ../test/snippet_api.py
+   :language: python
+   :start-after: # [word]
+   :end-before: # [word]
+   :dedent:
+
+- The lists follow the tree of groups: a heading per list, section and subsection (Word's
+  *Heading 1* to *Heading 3*), then a table: symbol, description and units for the
+  notations, short and long forms for the acronyms and abbreviations.
+- Every symbol is a **Word equation**, editable, written from the LaTeX symbol with its style
+  and references expanded (``\boldsymbol{u}`` for ``\velocity``); a reference in a
+  description becomes an equation too, and a reference to an acronym its short form.
+- **Units written with siunitx** (``\si{\metre\per\second}``, ``\SI{3}{\metre}``) are
+  converted, with their prefixes and powers (*m s⁻¹*, *kg m⁻³*, *km²*, *°C*, *μm*).
+- What pandoc cannot convert is **reported, by entry**, and the document is written anyway:
+  an unknown unit is left out (``notation 'length': Word: \furlong is not converted (left
+  out)``), an unknown command in a symbol is kept as TeX (``the math \unknowncmd{x} is not
+  converted``). The command line prints these problems, the interface shows them.
+- ``--reference-doc`` (``reference_doc`` in Python) takes the styles of a Word document of
+  yours: fonts, headings, tables.
+- Word cannot expand an acronym at its first use by itself: the list is there to copy from.
+
 Graphical interface
 -------------------
 
@@ -412,7 +447,8 @@ Graphical interface
 - *Edit › Languages* sets the languages, the default one first (``en, fr``): add one, make
   another the default (every required text needs a translation in it), or remove one (its
   translations are dropped, after confirmation).
-- *File* opens and saves notation files (Ctrl+O, Ctrl+S) and exports to LaTeX and Typst.
+- *File* opens and saves notation files (Ctrl+O, Ctrl+S) and exports to LaTeX, Typst and
+  Word (with the problems of the Word export, if any).
   Closing with unsaved changes asks whether to save them.
 
 The interface rewrites the file when it saves: comments are lost, and strings are written
@@ -429,9 +465,9 @@ Command line
 ``anatole list [-f {latex,typst}] [-l LANGUAGE] [--tag TAG]... FILE``
    List the styles and entries: kind, name, group, symbol (or short form) in a format (LaTeX
    by default) and description (or long form) in a language (the default one by default).
-``anatole export [-f {latex,typst}] [-l LANGUAGE] [-t {nomencl+acro,glossaries}] [--tag TAG]... FILE OUTPUT``
-   Export a notation file. The format follows the suffix of ``OUTPUT`` (``.tex`` and
-   ``.sty``: LaTeX, ``.typ``: Typst) unless ``--format`` is given; the texts are in the
+``anatole export [-f {latex,typst,docx}] [-l LANGUAGE] [-t {nomencl+acro,glossaries}] [--tag TAG]... [--reference-doc DOCX] FILE OUTPUT``
+   Export a notation file. The output follows the suffix of ``OUTPUT`` (``.tex`` and
+   ``.sty``: LaTeX, ``.typ``: Typst, ``.docx``: Word) unless ``--format`` is given; the texts are in the
    default language unless ``--language`` is given; ``--latex-target`` chooses the LaTeX
    packages of the lists; ``--tag`` selects entries (see `Tags`_).
 

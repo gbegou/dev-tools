@@ -29,10 +29,20 @@ def snippet_api(tmp_path: Path) -> None:
     from anatole import export, load, to_typst
 
     notations = load(tmp_path / "notations.toml")
-    export(notations, tmp_path / "notations.tex")  # the format follows the suffix
-    export(notations, tmp_path / "notations-fr.typ", language="fr")
+    _ = export(notations, tmp_path / "notations.tex")  # the output follows the suffix
+    _ = export(notations, tmp_path / "notations-fr.typ", language="fr")
     print(to_typst(notations, language="fr"))  # #let velocity = $bold(upright(u))$ ...
     # [export]
+
+    from anatole.export.office import is_available
+
+    if is_available():
+        # [word]
+        problems = export(notations, tmp_path / "notations.docx")  # pip install anatole[office]
+        for problem in problems:  # what Word cannot show (an unknown unit...), by entry
+            print(problem)
+        # [word]
+        assert problems == []
 
     latex = (tmp_path / "notations.tex").read_text(encoding="utf-8")
     assert "\\newcommand{\\velocity}" in latex

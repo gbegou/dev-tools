@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from anatole import __version__
-from anatole.export import SUFFIXES, TARGETS, Target, export
+from anatole.export import OUTPUTS, SUFFIXES, TARGETS, OfficeError, Output, Target, export
 from anatole.io import load
 from anatole.model import Notation, NotationError
 from anatole.typing import FORMATS, Format, Language
@@ -23,7 +23,8 @@ class _Arguments(argparse.Namespace):
     file: Path | None = None
     files: list[Path] = []  # noqa: RUF012  # replaced, not mutated, by argparse
     output: Path | None = None
-    format: Format | None = None
+    format: Output | None = None
+    reference_doc: Path | None = None
     language: Language | None = None
     strict: bool = False
     target: Target = "nomencl+acro"
@@ -67,8 +68,8 @@ def _parser() -> argparse.ArgumentParser:
 
     export_ = commands.add_parser(
         "export",
-        help="export a notation file to LaTeX or Typst",
-        description="Export a notation file. The format follows the output suffix ("
+        help="export a notation file to LaTeX, Typst or Word",
+        description="Export a notation file. The output follows its suffix ("
         + ", ".join(f"{suffix}: {fmt}" for suffix, fmt in SUFFIXES.items())
         + ") unless --format is given. The descriptions are in the default language of the "
         + "file unless --language is given; a missing translation falls back on the default "
@@ -76,7 +77,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     _ = export_.add_argument("file", type=Path, help="the notation file")
     _ = export_.add_argument("output", type=Path, help="the file to write")
-    _ = export_.add_argument("-f", "--format", choices=FORMATS, help="the target format")
+    _ = export_.add_argument("-f", "--format", choices=OUTPUTS, help="the output")
     _ = export_.add_argument("-l", "--language", help="the language of the descriptions")
     _ = export_.add_argument(
         "-t",
@@ -93,6 +94,12 @@ def _parser() -> argparse.ArgumentParser:
         metavar="TAG",
         help="export the entries selected by this tag (repeat for several): those with the "
         + "tag, those without tags, and the entries they use",
+    )
+    _ = export_.add_argument(
+        "--reference-doc",
+        type=Path,
+        metavar="DOCX",
+        help="a Word document whose styles the Word export takes",
     )
     return parser
 
@@ -148,14 +155,24 @@ def _list(file: Path, fmt: Format, language: Language | None, tags: list[str] | 
 def _export(
     file: Path,
     output: Path,
-    fmt: Format | None,
+    fmt: Output | None,
     language: Language | None,
     *,
     target: Target,
     tags: list[str] | None,
+    reference_doc: Path | None,
 ) -> int:
-    export(load(file), output, fmt, language=language, target=target, tags=tags, source=file.name)
-    print(f"{output}: written")
+    problems = export(
+        load(file),
+        output,
+        fmt,
+        language=language,
+        target=target,
+        tags=tags,
+        source=file.name,
+        reference_doc=reference_doc,
+    )
+    print(f"{output}: written" + (f", {len(problems)} problems (see above)" if problems else ""))
     return 0
 
 
@@ -175,7 +192,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             case "check":
                 return _check(arguments.files, strict=arguments.strict)
             case "list" if file is not None:
-                return _list(file, arguments.format or "latex", arguments.language, arguments.tags)
+                fmt: Format = "typst" if arguments.format == "typst" else "latex"
+                return _list(file, fmt, arguments.language, arguments.tags)
             case "export" if file is not None and output is not None:
                 return _export(
                     file,
@@ -184,11 +202,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                     arguments.language,
                     target=arguments.target,
                     tags=arguments.tags,
+                    reference_doc=arguments.reference_doc,
                 )
             case _:
                 from anatole.gui import run  # noqa: PLC0415  # tkinter only when needed
 
                 return run(file)
-    except (OSError, ValueError) as error:  # NotationError is a ValueError
+    except (OSError, ValueError, OfficeError) as error:  # NotationError is a ValueError
         print(error, file=sys.stderr)
         return 1

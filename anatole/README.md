@@ -56,22 +56,26 @@ missing translation falls back on the default language):
   default) or [glossaries-extra](https://ctan.org/pkg/glossaries-extra)
   (`--latex-target glossaries`);
 - to **Typst**: `#let velocity = $vect(u)$`, `#cfd` (long at its first use, short
-  afterwards), `#notation-nomenclature()` and `#notation-acronyms()`.
+  afterwards), `#notation-nomenclature()` and `#notation-acronyms()`;
+- to **Word**: the lists as a `.docx` document, with the symbols as Word equations and the
+  siunitx units converted (with pandoc: `pip install 'anatole[office]'`).
 
 A graphical interface (Tkinter) browses, searches, creates, edits and translates the entries,
 styles and groups, with a Typst preview.
 
 ```console
-$ pip install -e '.[preview]'
+$ pip install -e '.[preview,office]'
 $ anatole gui examples/notations.toml
 $ anatole check examples/notations.toml
 $ anatole export examples/notations.toml notations.tex
 $ anatole export --latex-target glossaries examples/notations.toml notations.tex
 $ anatole export --language fr --tag thesis examples/notations.toml notations.typ
+$ anatole export --language fr examples/notations.toml notations.docx
 ```
 
-Python 3.12 or later, no runtime dependency (`typst` for the preview). The documentation
-(`doc/`, Sphinx) has the user manual, the API and the developer guide:
+Python 3.12 or later, no runtime dependency (`typst` for the preview, `pypandoc-binary` for
+Word). The documentation (`doc/`, Sphinx) has the user manual, the API and the developer
+guide:
 
 ```console
 $ pip install -e . --group doc

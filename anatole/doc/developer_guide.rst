@@ -14,6 +14,7 @@ Layout
        export/_common.py what the exports share: language, references, styles
        export/latex.py   LaTeX export (commands; nomencl and acro, or glossaries-extra)
        export/typst.py   Typst export (functions, variables, acronyms, lists)
+       export/office.py  Word export (pandoc, from a LaTeX source of the lists)
        preview.py        Typst rendering of a notation (optional typst package)
        cli.py            command line
        gui/              Tkinter interface: app (main window), groups (group editor),
@@ -70,8 +71,9 @@ Before every push:
    $ sphinx-build -W --keep-going -E -b html doc doc/_build/html
 
 The tests that need a tool are skipped when it is missing: the GUI tests (Tkinter and a
-display), the LaTeX document (``pdflatex``, ``makeindex``, ``nomencl``, ``siunitx``), the
-Typst documents and preview (``typst`` package), the documentation build (Sphinx and furo).
+display), the LaTeX documents (``pdflatex``, ``makeindex``, ``nomencl``, ``acro``,
+``glossaries-extra``, ``siunitx``), the Typst documents and preview (``typst`` package), the
+Word export (``pypandoc-binary``, ``python-docx``), the documentation build (Sphinx and furo).
 Run them all before a push: the skip reasons are listed by ``pytest -rs``.
 
 The example documents are compiled by the tests: ``examples/document.tex`` with the LaTeX
