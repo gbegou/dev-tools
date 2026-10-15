@@ -1,30 +1,9 @@
-"""Summarize and filter a basedpyright JSON report (``basedpyright --outputjson``).
+"""Summarize and filter a basedpyright report (basedpyright --outputjson).
 
-    basedpyright --outputjson > report.json
-    pyright_report.py summary report.json                 # counts by rule, file, package
-    pyright_report.py list report.json --package maia     # the errors on code using maia
-    pyright_report.py list report.json --rule reportCallIssue --severity all
-    pyright_report.py list report.json --file 'src/cases/*' --json > cases.json
-    pyright_report.py list report.json --package maia --fail   # CI gate: exit 1 if any
-    basedpyright --outputjson | pyright_report.py summary -    # report on standard input
-
-Both commands take the same filters: ``--severity`` (``error``, ``warning``,
-``information`` or ``all``; ``list`` keeps the errors by default, ``summary`` counts
-everything), ``--rule`` and ``--package`` (repeatable: any of them), ``--file`` (a glob
-on the path relative to ``--root``, repeatable). ``list --json`` writes the kept
-diagnostics as a report of the same format, so that the commands can be chained.
-
-basedpyright reports an error where the call is, in the calling file: a call into a
-library whose API changed shows as ``reportCallIssue`` (``No parameter named "dim"``)
-in your code. ``--package`` finds these: a diagnostic uses a package when the statement
-it is on uses a name the file bound by importing that package (``maia`` for ``import
-maia``, ``PT`` for ``import maia.pytree as PT``, ``compute_elements_center`` for ``from
-maia.algo import compute_elements_center``), or imports from it. A statement over
-several lines counts as a whole; for ``def``, ``for``, ``if``... only the header line
-counts. Relative imports are the file's own code, not a package.
-
-Exit status: 0, or 1 with ``list --fail`` when diagnostics are left; 2 for a report that
-cannot be read.
+The user documentation is ``--help`` (the texts below, in ``DESCRIPTION`` and
+``parse_args``) and doc/pyright_report.md; this file is organised as: reading the
+report, finding the packages each statement uses, the filters, the two commands, and
+the command line.
 """
 
 import argparse
@@ -291,7 +270,7 @@ def summary(kept: list[Diagnostic], total: int, root: Path, top: int) -> str:
             table("by rule", by_rule, ranked(by_rule, 0)),
             table(f"by file ({shown})", by_file, files),
             table(
-                "by package used (a statement may use several)",
+                "by package used",
                 by_package,
                 ranked(by_package, 0),
             ),
@@ -323,65 +302,192 @@ def as_report(report: Json, kept: list[Diagnostic]) -> Json:
 # --------------------------------------------------------------------------- command line
 
 
+DESCRIPTION = """\
+Summarize and filter a basedpyright report.
+
+"basedpyright --outputjson" writes every diagnostic of a project as JSON. This tool
+answers the questions a long report raises:
+
+  summary   how many errors and warnings, of which rules, in which files, on
+            statements using which packages
+  list      the diagnostics themselves, one per line (path:line:column: severity:
+            message (rule)), to open in an editor or to fail a CI job
+
+Both commands read the report from a file or from standard input (-) and take the
+same filters (--severity, --rule, --file, --package); "%(prog)s COMMAND --help"
+explains them.
+
+basedpyright reports an error where the call is, in the calling file: a library whose
+API changed shows up in your code as reportCallIssue ('No parameter named "dim"'),
+lost among the warnings about untyped libraries. "--package NAME" keeps the
+diagnostics on statements that use that package."""
+
+EPILOG = """\
+examples:
+  write the report of the project in the current directory:
+    basedpyright --outputjson > report.json
+  how many errors and warnings, of which rules, where:
+    %(prog)s summary report.json
+  the errors on statements using maia:
+    %(prog)s list report.json --package maia
+  in a CI job, fail on any wrong call (no file written):
+    basedpyright --outputjson | %(prog)s list - --rule reportCallIssue --fail
+
+exit status: 0; 1 for "list --fail" when diagnostics are left; 2 when the report
+cannot be read.
+
+documentation: doc/pyright_report.md in dev-tools."""
+
+SUMMARY_DESCRIPTION = """\
+Count the diagnostics, per severity: by rule, by file (most errors first) and by
+package used. The first line gives the totals, and how many diagnostics of the report
+the filters kept."""
+
+SUMMARY_EPILOG = """\
+examples:
+  everything:
+    %(prog)s report.json
+  the errors only:
+    %(prog)s report.json --severity error
+  the diagnostics on statements using maia, every file listed:
+    %(prog)s report.json --package maia --top 0
+
+A statement that uses several packages is counted once in the row of each; a statement
+that uses none is counted in the "(none)" row."""
+
+LIST_DESCRIPTION = """\
+Print the diagnostics, one per line, as compilers do (editors and terminals open them):
+
+  path:line:column: severity: message (rule)
+
+with the path relative to --root, and the line and column counted from 1. Without
+filters, the errors."""
+
+LIST_EPILOG = """\
+examples:
+  the errors:
+    %(prog)s report.json
+  the calls into maia with wrong arguments:
+    %(prog)s report.json --package maia --rule reportCallIssue
+  every diagnostic under src/, multi-line messages in full:
+    %(prog)s report.json --file 'src/*' --severity all --full
+  the errors on statements using maia, saved as a report:
+    %(prog)s report.json --package maia --json > maia.json
+  in a CI job, fail if an error is on a statement using maia:
+    %(prog)s report.json --package maia --fail"""
+
+PACKAGE_HELP = """keep the diagnostics on statements that use this top-level package: \
+a name the file bound by importing it ("import maia.pytree as PT" binds PT, \
+"from maia.algo import f" binds f), or an import from it; a statement over several \
+lines counts as a whole, a def/for/if/with by its header line; relative imports are \
+the file's own code. Repeatable: any of them"""
+
+
+def add_filters(command: argparse.ArgumentParser, default_severity: str) -> None:
+    """The options that select diagnostics, the same for both commands."""
+    keep_group = command.add_argument_group(
+        "what to keep",
+        "the options combine (all must hold); a repeated option keeps any",
+    )
+    _ = keep_group.add_argument(
+        "--severity",
+        choices=(*SEVERITIES, "all"),
+        default=default_severity,
+        help="keep the diagnostics of this severity (default: %(default)s)",
+    )
+    _ = keep_group.add_argument(
+        "--rule",
+        action="append",
+        default=[],
+        metavar="RULE",
+        help="keep this basedpyright rule, e.g. reportCallIssue (repeatable)",
+    )
+    _ = keep_group.add_argument(
+        "--file",
+        action="append",
+        default=[],
+        metavar="GLOB",
+        help=(
+            "keep the files whose path relative to --root matches this glob, e.g. "
+            "'src/*' or '*/test_*.py' (quote it; * also matches /; repeatable)"
+        ),
+    )
+    _ = keep_group.add_argument(
+        "--package", action="append", default=[], metavar="NAME", help=PACKAGE_HELP
+    )
+    _ = keep_group.add_argument(
+        "--root",
+        type=Path,
+        default=Path.cwd(),
+        metavar="DIR",
+        help=(
+            "the project root: paths are shown, and --file globs matched, relative "
+            "to it (default: the current directory)"
+        ),
+    )
+
+
 def parse_args(argv: list[str] | None) -> argparse.Namespace:
     """The command line."""
+    formatter = argparse.RawDescriptionHelpFormatter
     parser = argparse.ArgumentParser(
-        description=(__doc__ or "").splitlines()[0],
-        epilog="See the module docstring (the top of this file) for the details.",
+        description=DESCRIPTION, epilog=EPILOG, formatter_class=formatter
     )
-    commands = parser.add_subparsers(dest="command", required=True)
-    for name, text in (
-        ("summary", "counts by severity, rule, file and package"),
-        ("list", "the diagnostics, one per line (path:line:column)"),
-    ):
-        command = commands.add_parser(name, help=text, description=text)
-        _ = command.add_argument("report", help="basedpyright --outputjson file, or -")
-        _ = command.add_argument(
-            "--severity",
-            choices=(*SEVERITIES, "all"),
-            default="error" if name == "list" else "all",
-            help="keep this severity (default: %(default)s)",
-        )
-        _ = command.add_argument(
-            "--rule", action="append", default=[], help="keep this rule (repeatable)"
-        )
-        _ = command.add_argument(
-            "--file",
-            action="append",
-            default=[],
-            help="keep the paths matching this glob (repeatable)",
-        )
-        _ = command.add_argument(
-            "--package",
-            action="append",
-            default=[],
-            help="keep the code using this package (repeatable)",
-        )
-        _ = command.add_argument(
-            "--root",
-            type=Path,
-            default=Path.cwd(),
-            help="paths are shown relative to it (default: .)",
-        )
-        if name == "summary":
-            _ = command.add_argument(
-                "--top",
-                type=int,
-                default=10,
-                help="files shown, most errors first (0: all)",
-            )
-        else:
-            _ = command.add_argument(
-                "--full", action="store_true", help="multi-line messages in full"
-            )
-            _ = command.add_argument(
-                "--json",
-                action="store_true",
-                help="write the kept diagnostics as a report",
-            )
-            _ = command.add_argument(
-                "--fail", action="store_true", help="exit 1 if any diagnostic is kept"
-            )
+    commands = parser.add_subparsers(
+        dest="command", required=True, title="commands", metavar="COMMAND"
+    )
+    report_help = (
+        "the output of basedpyright --outputjson: a file, or - for standard input"
+    )
+
+    summary_command = commands.add_parser(
+        "summary",
+        help="counts by rule, file and package",
+        description=SUMMARY_DESCRIPTION,
+        epilog=SUMMARY_EPILOG,
+        formatter_class=formatter,
+    )
+    _ = summary_command.add_argument("report", metavar="REPORT", help=report_help)
+    add_filters(summary_command, default_severity="all")
+    _ = summary_command.add_argument_group("output").add_argument(
+        "--top",
+        type=int,
+        default=10,
+        metavar="N",
+        help=(
+            "the number of files listed, most errors first (default: %(default)s; "
+            "0: all)"
+        ),
+    )
+
+    list_command = commands.add_parser(
+        "list",
+        help="the diagnostics, one per line (path:line:column)",
+        description=LIST_DESCRIPTION,
+        epilog=LIST_EPILOG,
+        formatter_class=formatter,
+    )
+    _ = list_command.add_argument("report", metavar="REPORT", help=report_help)
+    add_filters(list_command, default_severity="error")
+    output = list_command.add_argument_group("output")
+    _ = output.add_argument(
+        "--full",
+        action="store_true",
+        help="print multi-line messages in full (default: their first line)",
+    )
+    _ = output.add_argument(
+        "--json",
+        action="store_true",
+        help=(
+            "write the kept diagnostics as a basedpyright report (counts updated), "
+            "to save it or to pipe it into another command"
+        ),
+    )
+    _ = output.add_argument(
+        "--fail",
+        action="store_true",
+        help="exit with status 1 if any diagnostic is kept (for a CI job)",
+    )
     return parser.parse_args(argv)
 
 
@@ -399,7 +505,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     report = load_report(cast("str", args.report))
     diagnostics = diagnostics_of(report)
-    kept = [d for d in diagnostics if keep(d, filters)]
+    kept = sorted(
+        (d for d in diagnostics if keep(d, filters)),
+        key=lambda d: (relative(d.file, root), d.first_line, d.column),
+    )
     if cast("str", args.command) == "summary":
         print(summary(kept, len(diagnostics), root, cast("int", args.top)))
         return 0
