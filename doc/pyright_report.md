@@ -149,6 +149,10 @@ imported one counts as the import.
 pyright_report.py list report.json --package maia --rule reportCallIssue --rule reportAttributeAccessIssue
 ```
 
+A positional argument whose expected type changed (`f(t, 2)` becoming `f(t, "ALLFACES")`) is
+`reportArgumentType`: add `--rule reportArgumentType`. That rule also reports the ordinary type
+mismatches of your own code, but `--package` keeps only the statements that use the library.
+
 **Triaging a large report.** Start from `summary`, then narrow down by rule or file:
 
 ```bash
