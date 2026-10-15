@@ -9,6 +9,7 @@ the command line.
 import argparse
 import ast
 import json
+import os
 import sys
 from collections import Counter, defaultdict
 from collections.abc import Iterable
@@ -334,7 +335,7 @@ examples:
     basedpyright --outputjson | %(prog)s list - --rule reportCallIssue --fail
 
 exit status: 0; 1 for "list --fail" when diagnostics are left; 2 when the report
-cannot be read.
+cannot be read; 141 when the output is closed early (piped into head).
 
 documentation: doc/pyright_report.md in dev-tools."""
 
@@ -521,4 +522,14 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        status = main()
+        _ = sys.stdout.flush()
+    except BrokenPipeError:
+        # the reader of the output left early (`| head`): stop without a traceback, as
+        # other commands do. Python would fail again flushing the output at exit, so the
+        # output goes to /dev/null; 141 is what a shell shows for a command stopped this
+        # way (128 + SIGPIPE).
+        _ = os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+        status = 141
+    sys.exit(status)

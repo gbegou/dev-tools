@@ -11,7 +11,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import cast
+from typing import IO, cast
 
 import pytest
 
@@ -220,6 +220,29 @@ def test_unreadable_reports(tmp_path: Path) -> None:
     _ = other.write_text("[]")
     assert run("summary", str(other)).returncode == 2
     assert run("summary", "-", stdin="not json").returncode == 2
+
+
+def test_output_closed_early(project: tuple[Path, Path]) -> None:
+    """Piped into a reader that stops early (``| head``): no traceback, status 141"""
+    root, report = project
+    # many lines, more than a pipe holds, so that the tool is still writing when the
+    # reader leaves
+    data = cast("dict[str, list[object]]", json.loads(report.read_text()))
+    data["generalDiagnostics"] *= 2000
+    _ = report.write_text(json.dumps(data))
+    tool = subprocess.Popen(
+        [sys.executable, str(TOOL), "list", str(report), "--root", str(root)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    # typeshed types the pipes IO[Any]
+    out, err = cast("IO[str]", tool.stdout), cast("IO[str]", tool.stderr)
+    assert out.readline().startswith("pkg/user.py:")
+    out.close()
+    stderr = err.read()
+    assert tool.wait() == 141
+    assert stderr == ""
 
 
 @pytest.mark.skipif(shutil.which("basedpyright") is None, reason="basedpyright missing")

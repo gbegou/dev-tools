@@ -183,3 +183,4 @@ python tools/pyright_report.py list report.json --package maia --rule reportCall
 | 0 | the command ran |
 | 1 | `list --fail`, and some diagnostics are left |
 | 2 | the report cannot be read, or is not a basedpyright report (no `generalDiagnostics`) |
+| 141 | the output was closed before the end (piped into `head`, for instance), as for other commands |
