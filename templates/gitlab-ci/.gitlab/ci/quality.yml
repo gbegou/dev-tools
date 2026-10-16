@@ -27,6 +27,9 @@ job:stubs:
 # GitLab Code Quality reports (shown in merge requests) and mark the job orange.
 #   exit 3: venv or install failed (optional tool missing, e.g. no network)
 #   exit 4: quality issues found (see the job log or the Code Quality report)
+# A project whose type checking needs the Python modules of built dependencies (numbat: maia,
+# Pypdm, pomac and MARCeL, built from external/) adds `- job: job:build` (artifacts: false) to
+# `needs` and `- source "${BUILD_DIR}/source.sh"` before `cd "${CUSTOM_CI_DIR}"`.
 job:lint:
   stage: quality
   extends: .with_hpc_modules

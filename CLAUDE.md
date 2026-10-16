@@ -108,6 +108,15 @@ project.
   CMake warning), so that the rest still runs.
 - Deployment uses modulefiles; testing uses the `source.sh` that project_utils writes in the
   build directory.
+- The documentation is the `<project>_sphinx` target
+  (`templates/cmake/sphinx_documentation.cmake`): out of the default build (build everything,
+  then the target), Sphinx run as
+  `python -m sphinx -W` by the Python the project is configured with (a venv with the `doc`
+  group), through bash with `source.sh` sourced.
+- Every Python process that imports an MPI module (mpi4py, maia...) runs through
+  `mpiexec -np 1`, for one process too: the serial tests, the documentation test, the Sphinx
+  target, the commands of the developer guide. Open MPI cannot start a lone process on every
+  cluster node (Omni-Path on juno).
 
 ## GitLab CI (cluster)
 
@@ -116,8 +125,10 @@ project.
   `job:doc` (the `doc` dependency group): a temporary venv (`--system-site-packages`, from the
   loaded python3).
 - Layout: `.gitlab-ci.yml` includes `.gitlab/ci/{common,init,build,test,quality,doc}.yml`
-  (see `templates/gitlab-ci/`). `job:init` clones manually into a shared workspace and passes
-  the paths as a dotenv artifact. `job:build` configures and builds once, with all tests
+  (see `templates/gitlab-ci/`). `job:init` clones manually into a shared workspace on the
+  cluster's scratch filesystem (`/tmp_user` on juno, never the home directory: far slower for
+  the many small files of a build, of the imports and of the coverage data) and passes the
+  paths as a dotenv artifact. `job:build` configures and builds once, with all tests
   enabled. Test jobs only select subsets with `ctest -R` (never reconfigure).
 - Stages `init, build, test, quality, doc, deploy`. The real tests are in `test` and fail red.
   Checks that depend on optional tools (stubs, lint) are in `quality`, and exit with

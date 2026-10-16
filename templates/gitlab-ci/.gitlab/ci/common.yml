@@ -50,6 +50,10 @@ default:
 #     network access for CMake to fetch it),
 #     pytest, mpi4py (pytest_parallel plugin loaded by source.sh), pybind11-stubgen (or the
 #     external/pybind11-stubgen submodule);
+#   - the mpirun (or mpiexec) of the loaded MPI on the PATH: every Python process that imports
+#     an MPI module runs through `mpiexec -np 1`, the serial tests and the documentation too
+#     (Open MPI cannot start a lone process on every juno node: "Error obtaining unique
+#     transport key from PMIX");
 #   - for the documentation: the "doc" dependency group of pyproject.toml, installed by job:doc
 #     in a venv;
 #   - for job:lint: ruff and basedpyright.
@@ -66,6 +70,7 @@ default:
     - echo "CMake used by this job:" && which cmake && cmake --version
     - echo "C++ compiler used by this job:" && which g++ && g++ --version
     - echo "Python used by this job:" && which python3 && python3 --version
+    - echo "MPI launcher used by this job:" && (which mpirun || which mpiexec || true)
 
 # -----------------------------------------------------------------------------
 # Test job template
@@ -77,6 +82,9 @@ default:
 #
 # pomac's tests are selected by name (create_doctest / create_pytest of project_utils
 # do not set CTest labels): pomac_doctest_*, pomac_pytest_*, pomac_stubs_*, pomac_doc_*.
+# A project with several ctest tests of one kind gives each its job (dspod:
+# job:test-python with dspod_pytest_serial, job:test-python-parallel with
+# dspod_pytest_parallel), so that a red job names the failing one.
 #
 # Optional tools (jobs of the quality stage): a job lists the Python modules its tests need
 # in OPTIONAL_PYTHON_MODULES.

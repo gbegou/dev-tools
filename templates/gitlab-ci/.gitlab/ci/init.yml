@@ -2,9 +2,15 @@
 # STAGE: INIT
 # =============================================================================
 #
-# Manual clone into a shared Jacamar workspace:
+# Manual clone into a shared Jacamar workspace, on juno's scratch filesystem (as the CI of
+# maia, numbat and dspod):
 #
-#   ~/.jacamar-ci/builds/${CI_PROJECT_NAME}/${CI_PIPELINE_ID}
+#   /tmp_user/juno/<user>/.jacamar-ci/builds/${CI_PROJECT_NAME}/${CI_PIPELINE_ID}
+#
+# not in the home directory (/stck), which is much slower for the many small files of a
+# build, of the Python imports and of the coverage data, written by many processes at once
+# (numbat measured its tests 10 to 450 times slower there: the stubs check took 154 s instead
+# of 0.3 s). On another cluster, use its scratch filesystem in the same way.
 #
 # Later jobs receive this path through a dotenv artifact and reuse the same
 # directory, instead of uploading/downloading the build tree as an artifact.
@@ -19,7 +25,8 @@ job:init:
     - set -e
     # GitLab collects build.env from the original job directory (dotenv artifact).
     - INIT_ORIGINAL_FOLDER="$(pwd)"
-    - CI_WORKSPACE_BASE="${HOME}/.jacamar-ci/builds/${CI_PROJECT_NAME}"
+    # The persistent workspace, on the scratch filesystem (see above).
+    - CI_WORKSPACE_BASE="/tmp_user/juno/$(whoami)/.jacamar-ci/builds/${CI_PROJECT_NAME}"
     - mkdir -p "${CI_WORKSPACE_BASE}"
     - cd "${CI_WORKSPACE_BASE}"
     # Clean a previous directory with the same pipeline ID (retried job).

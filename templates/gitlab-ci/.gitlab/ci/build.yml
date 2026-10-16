@@ -29,4 +29,5 @@ job:build:
       -Dpomac_ENABLE_DOCUMENTATION=OFF \
       -DPython_EXECUTABLE="$(command -v python3)" \
       ..
-    - make -j ${BUILD_JOBS}
+    # Compile everything once (cmake --build: whatever the generator).
+    - cmake --build . --parallel "${BUILD_JOBS}"
