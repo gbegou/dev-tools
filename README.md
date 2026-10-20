@@ -5,7 +5,7 @@ Rules and tools I give to Claude, reusable across projects.
 | Path | Content |
 | --- | --- |
 | `CLAUDE.md` | The rules: git workflow, reviews, audits, Python, C++, tests and docs, dependencies, GitLab CI, official/GitHub sync |
-| `tools/sync_project.sh` | Raw copy (no git history) between an official repository and its GitHub copy; `--help` for usage |
+| `tools/sync_project.sh` | Raw copy (no git history) between an official repository and its GitHub copy; `--keep PATTERN` keeps the destination's files the source lacks (e.g. `--keep 'modulefiles/*'`); `--help` for usage |
 | `tools/git-pin-submodule` | Adds or updates a submodule (`--url`, `--branch`, `--commit` or `--tag`), staged; what is not given comes from `.gitmodules` or the branch's tip, so `git pin-submodule <path>` updates a submodule and `-b dev/official` switches its branch (`git pin-submodule` once on PATH); `--help` explains each git command |
 | `tools/check_ci.py` | Checks GitLab CI files: script lines are strings, `needs`/`extends` resolve |
 | `tools/pyright_report.py` | Works through a basedpyright report (`basedpyright --outputjson`): `summary` counts errors and warnings by rule, file and package used; `list` prints them as `path:line:column` lines, filtered by severity, rule, file or package (e.g. the calls into a library whose API changed), with `--fail` for a CI gate; guide in `doc/pyright_report.md`, options in `--help` |

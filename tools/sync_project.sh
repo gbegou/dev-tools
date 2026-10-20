@@ -7,12 +7,21 @@
 #       gh/<name>/            GitHub repository
 #
 # Usage:
-#   sync_project.sh [--apply] [--force] <name> to-github   [ref]   # ref default: HEAD of the official repo
-#   sync_project.sh [--apply] [--force] <name> to-official <ref>   # e.g. origin/merge/viscosity-protocol
-#   sync_project.sh -h | --help                                    # this help
+#   sync_project.sh [--apply] [--force] [--keep PATTERN]... <name> to-github   [ref]   # ref default: HEAD of the official repo
+#   sync_project.sh [--apply] [--force] [--keep PATTERN]... <name> to-official <ref>   # e.g. origin/merge/viscosity-protocol
+#   sync_project.sh -h | --help                                                      # this help
 #
 # Without --apply, nothing is written: the script shows what would change (dry run).
 # --force: accept a destination with uncommitted changes (they would be overwritten).
+# --keep PATTERN (or --keep=PATTERN, repeatable): never remove the destination's files that
+#   match PATTERN, even when the source does not have them, e.g. files added on the official
+#   side that the GitHub copy does not have yet:
+#       sync_project.sh --apply --keep 'modulefiles/*' <name> to-official origin/<tip>
+#   PATTERN is a path relative to the project root, matched as a bash pattern in which *
+#   also matches /, so 'modulefiles/*' covers modulefiles/dspod/sator-socle7/dev; a directory
+#   ('modulefiles' or 'modulefiles/') covers everything under it. Quote it: unquoted, the
+#   shell may expand it into several arguments. Only removals are prevented: a kept file that
+#   the source has is updated as usual. A pattern that kept nothing is reported (a typo?).
 #
 # What is copied: exactly the files tracked at <ref> (git archive), i.e. no .git, no build
 # directories, no virtual environments, no caches, no untracked files. Files that the
@@ -44,11 +53,16 @@ usage() { sed -n '2,/^set -euo/p' "$0" | sed '$d' | sed 's/^# \{0,1\}//'; }
 
 apply=false
 force=false
+keeps=()   # --keep patterns: destination files never removed
 while [[ $# -gt 0 && $1 == -* ]]; do
   case $1 in
     -h|--help) usage; exit 0 ;;
     --apply) apply=true ;;
     --force) force=true ;;
+    --keep=*) keeps+=("${1#--keep=}") ;;
+    --keep)
+      [[ $# -ge 2 && -n $2 ]] || { echo "--keep needs a pattern, e.g. --keep 'modulefiles/*'" >&2; exit 2; }
+      keeps+=("$2"); shift ;;
     *) echo "unknown option: $1 (see --help)" >&2; exit 2 ;;
   esac
   shift
@@ -134,11 +148,34 @@ changes=$(rsync "${rsync_opts[@]}" "$export_dir/" "$dst/")   # set -e: stops on 
 changes=$(awk '$1 ~ /^>[fL]/ { print ($1 ~ /\+\+\+/ ? "added    " : "updated  "), $2 }' <<<"$changes")
 # removed: tracked at the destination (not a submodule, not excluded), absent from the export
 excluded() { local e; for e in "${excludes[@]}"; do [[ /$1 == "$e" || /$1 == "$e"/* ]] && return 0; done; return 1; }
+# kept: the first --keep pattern that matches a path (a bash pattern, * matching / too; a
+# directory covers its content), in $keep_pattern; false when none does
+keep_pattern=
+kept() {
+  local k pattern dir
+  for k in ${keeps[@]+"${keeps[@]}"}; do
+    pattern=${k#/}       # relative to the project root, with or without a leading /
+    dir=${pattern%/}
+    # shellcheck disable=SC2053  # $pattern unquoted on purpose: it is a pattern
+    if [[ $1 == $pattern || $1 == "$dir"/* ]]; then keep_pattern=$k; return 0; fi
+  done
+  return 1
+}
 removed=()
+declare -A used_keeps=()   # the patterns that kept a file (the others are reported)
 while IFS= read -r file; do
-  excluded "$file" || [[ -e $export_dir/$file || -L $export_dir/$file ]] || removed+=("$file")
+  excluded "$file" || [[ -e $export_dir/$file || -L $export_dir/$file ]] && continue
+  if kept "$file"; then
+    changes+=$'\n'"kept      $file  (--keep $keep_pattern)"
+    used_keeps[$keep_pattern]=1
+  else
+    removed+=("$file")
+  fi
 done < <(git -C "$dst" -c core.quotepath=off ls-files -s | awk '$1 != "160000"' | cut -f2-)
-for file in "${removed[@]}"; do
+for k in ${keeps[@]+"${keeps[@]}"}; do
+  [[ -n ${used_keeps[$k]+x} ]] || changes+=$'\n'"--keep '$k': no file of the destination to keep (a typo?)"
+done
+for file in ${removed[@]+"${removed[@]}"}; do
   changes+=$'\n'"removed   $file"
   if $apply; then
     rm -f -- "$dst/$file"

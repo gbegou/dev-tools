@@ -46,6 +46,20 @@ Put `tools/` on your `PATH`: `git-pin-submodule` is then also `git pin-submodule
    the GitHub-only files (`.github/`), and every file the official git does not track: build
    directories, virtual environments, caches, local files.
 
+   A file the official git tracks and the tip does not have is removed. When it was added on
+   the official side and the GitHub copy does not have it yet (modulefiles of a new cluster,
+   say), keep it with `--keep`, in the dry run and the apply alike:
+
+   ```bash
+   sync_project.sh --apply --keep 'modulefiles/*' <name> to-official origin/<tip>
+   ```
+
+   The pattern is relative to the project root, `*` matches `/` too, and a directory
+   (`--keep modulefiles`) covers what is under it; quote it, or the shell may expand it. The
+   dry run lists such files as `kept`, and a pattern that kept nothing (a typo) is reported.
+   Only removals are prevented: a kept file that the tip has is updated. Then bring the file
+   to the GitHub copy, so that the next sync no longer needs the option.
+
 4. Align the submodules. The dry run printed one command per submodule whose URL or commit
    differs, ready to paste:
 
@@ -70,6 +84,9 @@ it, then pin kord's `external/pomac` on that official commit, with the official 
 sync_project.sh <name> to-github            # dry run, HEAD of the official repo
 sync_project.sh --apply <name> to-github
 ```
+
+`--keep PATTERN` works this way too: it keeps the GitHub files that the official repository
+does not have.
 
 The GitHub `.gitmodules` is kept: its URLs are those the GitHub side can reach. For each
 submodule of the official repository, the dry run says what happens:
