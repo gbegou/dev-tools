@@ -117,6 +117,13 @@ project.
   `mpiexec -np 1`, for one process too: the serial tests, the documentation test, the Sphinx
   target, the commands of the developer guide. Open MPI cannot start a lone process on every
   cluster node (Omni-Path on juno).
+- The MPI ranks of the tests are not bound to cores: Open MPI binds every `mpiexec` from core
+  0, so the tests that `ctest --parallel` runs side by side pile up on the first cores. The CI
+  sets `PRTE_MCA_hwloc_default_binding_policy=none` (Open MPI 5) and
+  `OMPI_MCA_hwloc_base_binding_policy=none` (Open MPI 4) for every job
+  (`templates/gitlab-ci/.gitlab/ci/common.yml`), and `test/CMakeLists.txt` appends them to the
+  environment of every registered test
+  (`set_property(TEST <name> APPEND PROPERTY ENVIRONMENT ...)`), as numbat and dspod do.
 
 ## GitLab CI (cluster)
 

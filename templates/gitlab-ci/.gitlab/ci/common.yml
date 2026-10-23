@@ -14,6 +14,16 @@
 #
 # BUILD_JOBS: number of parallel compile jobs.
 # CTEST_JOBS: number of tests allowed to run in parallel inside each test job.
+#
+# PRTE_MCA_hwloc_default_binding_policy, OMPI_MCA_hwloc_base_binding_policy: "none"
+#   MPI ranks not bound to cores. Open MPI binds the ranks of each mpirun (or mpiexec)
+#   starting at core 0, without knowing about the other runs at the same time (ctest
+#   --parallel, and the jobs side by side on the runner): every test piled up on the first
+#   cores, a one-rank test (mpiexec -np 1) with all its threads on core 0. Not bound, the OS
+#   spreads them over the node (numbat: 131 s bound, 81 s not bound; its C++ tests went over
+#   900 s bound). Open MPI 5 reads the PRTE_MCA_ name, Open MPI 4 the OMPI_MCA_ one. The
+#   project's test/CMakeLists.txt sets them in the ENVIRONMENT of its tests too, for a local
+#   ctest --parallel (CLAUDE.md, Build and dependencies).
 
 variables:
   GIT_STRATEGY: none
@@ -21,6 +31,8 @@ variables:
 
   BUILD_JOBS: "24"
   CTEST_JOBS: "8"
+  PRTE_MCA_hwloc_default_binding_policy: "none"
+  OMPI_MCA_hwloc_base_binding_policy: "none"
 
 
 # -----------------------------------------------------------------------------

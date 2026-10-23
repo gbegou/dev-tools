@@ -53,7 +53,8 @@ function(project_sphinx_documentation)
   set(sphinx_index_file ${sphinx_build}/index.html)
   set(launcher "")
   if(MPIEXEC_EXECUTABLE)
-    set(launcher "${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 1 ")
+    # the rank not bound to a core (Open MPI 5 and 4 names): the figures use every core
+    set(launcher "export PRTE_MCA_hwloc_default_binding_policy=none OMPI_MCA_hwloc_base_binding_policy=none && ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 1 ")
   endif()
 
   file(GLOB_RECURSE doc_files CONFIGURE_DEPENDS ${sphinx_source}/*)
